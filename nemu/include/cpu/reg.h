@@ -29,6 +29,17 @@ typedef struct {
   rtlreg_t eax, ecx, edx, ebx, esp, ebp, esi, edi;
 
   vaddr_t eip;
+  union{
+    rtlreg_t eflags_init;
+    struct{
+      unsigned int CF:1;
+      unsigned int ZF:1;
+      unsigned int SF:1;
+      unsigned int IF:1;
+      unsigned int OF:1;
+    };
+  }eflags;
+  
 
 } CPU_state;
 
