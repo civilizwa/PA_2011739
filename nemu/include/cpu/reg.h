@@ -39,7 +39,10 @@ typedef struct {
       unsigned int OF:1;
     };
   }eflags;
-  
+  struct{
+    uint16_t limit;
+    uint32_t base;
+  }idtr;
 
 } CPU_state;
 
