@@ -51,7 +51,7 @@ static struct {
   { "q", "Exit NEMU", cmd_q },
   /* TODO: Add more commands */
   {"si","Let the program execute n steps",cmd_si},
-  {"info", "Display the register status and the watchpoint information", cmd_info}
+  //{"info", "Display the register status and the watchpoint information", cmd_info}
 };
 
 #define NR_CMD (sizeof(cmd_table) / sizeof(cmd_table[0]))
