@@ -39,7 +39,7 @@ static int cmd_q(char *args) {
 static int cmd_help(char *args);
 static int cmd_si(char *args);
 static int cmd_info(char *args);
-
+static int cmd_x(char *args);
 
 static struct {
   char *name;
@@ -51,7 +51,8 @@ static struct {
   { "q", "Exit NEMU", cmd_q },
   /* TODO: Add more commands */
   {"si","Let the program execute n steps",cmd_si},
-  {"info", "Display the register status and the watchpoint information", cmd_info}
+  {"info", "Display the register status and the watchpoint information", cmd_info},
+  {"x","Caculate the value of expression and display the content of the address",cmd_x},
 };
 
 #define NR_CMD (sizeof(cmd_table) / sizeof(cmd_table[0]))
@@ -116,6 +117,25 @@ static int cmd_info(char *args){
   }
   return 0;
 }
+static int cmd_x(char *args) {
+  if (args == NULL) {
+    printf("Input invalid command!\n");
+  }
+  else {
+    int num, addr, i;
+    char *exp;
+    num = atoi(strtok(NULL, " "));
+    exp = strtok(NULL, " ");
+    addr = trans(exp);
+
+    for (i = 0; i < num; i++) {
+      printf("0x%x\n", vaddr_read(addr, 4));
+      addr += 4;
+    }
+
+  }
+  return 0;
+}
 void ui_mainloop(int is_batch_mode) {
   if (is_batch_mode) {
     cmd_c(NULL);
@@ -153,4 +173,19 @@ void ui_mainloop(int is_batch_mode) {
 
     if (i == NR_CMD) { printf("Unknown command '%s'\n", cmd); }
   }
+
+}
+int trans(char *e) {
+  int len, num, i, j;
+  len = strlen(e);
+  num = 0;
+  j = 1;
+
+  for (i = len-1; i > 1; i--) {
+    num += (e[i]-'0')*j;
+    j *= 16;
+  }
+//  printf("num = %d\n", num);
+
+  return num;
 }
