@@ -37,6 +37,9 @@ static int cmd_q(char *args) {
 }
 
 static int cmd_help(char *args);
+static int cmd_si(char *args);
+static int cmd_info(char *args);
+
 
 static struct {
   char *name;
@@ -46,9 +49,9 @@ static struct {
   { "help", "Display informations about all supported commands", cmd_help },
   { "c", "Continue the execution of the program", cmd_c },
   { "q", "Exit NEMU", cmd_q },
-
   /* TODO: Add more commands */
-
+  {"si","Let the program execute n steps",cmd_si},
+  {"info", "Display the register status and the watchpoint information", cmd_info}
 };
 
 #define NR_CMD (sizeof(cmd_table) / sizeof(cmd_table[0]))
@@ -73,6 +76,20 @@ static int cmd_help(char *args) {
     }
     printf("Unknown command '%s'\n", arg);
   }
+  return 0;
+}
+static int cmd_si(char *args){
+  //调用strtok获取执行步数
+  int steps;
+  //无参默认1步
+  if(args==NULL){
+    steps=1;
+  }
+  else{
+    //Divide S into tokens separated by characters in DELIM.
+    steps=atoi(strtok(NULL," "));
+  }
+  cpu_exec(steps);
   return 0;
 }
 
