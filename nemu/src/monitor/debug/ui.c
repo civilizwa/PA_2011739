@@ -38,7 +38,7 @@ static int cmd_q(char *args) {
 
 static int cmd_help(char *args);
 static int cmd_si(char *args);
-//static int cmd_info(char *args);
+static int cmd_info(char *args);
 
 
 static struct {
@@ -51,7 +51,7 @@ static struct {
   { "q", "Exit NEMU", cmd_q },
   /* TODO: Add more commands */
   {"si","Let the program execute n steps",cmd_si},
-  //{"info", "Display the register status and the watchpoint information", cmd_info}
+  {"info", "Display the register status and the watchpoint information", cmd_info}
 };
 
 #define NR_CMD (sizeof(cmd_table) / sizeof(cmd_table[0]))
@@ -92,7 +92,30 @@ static int cmd_si(char *args){
   cpu_exec(steps);
   return 0;
 }
-
+static int cmd_info(char *args){
+  if (args == NULL) {
+    printf("Please input the info r or info w\n");
+  }
+  else {
+    if (strcmp(args, "r") == 0) {
+      printf("eax:  0x%-10x    %-10d\n", cpu.eax, cpu.eax);
+      printf("edx:  0x%-10x    %-10d\n", cpu.edx, cpu.edx);
+      printf("ecx:  0x%-10x    %-10d\n", cpu.ecx, cpu.ecx);
+      printf("ebx:  0x%-10x    %-10d\n", cpu.ebx, cpu.ebx);
+      printf("ebp:  0x%-10x    %-10d\n", cpu.ebp, cpu.ebp);
+      printf("esi:  0x%-10x    %-10d\n", cpu.esi, cpu.esi);
+      printf("esp:  0x%-10x    %-10d\n", cpu.esp, cpu.esp);
+      printf("eip:  0x%-10x    %-10d\n", cpu.eip, cpu.eip);
+    }
+    else if (strcmp(args, "w") == 0) {
+      display_wp();
+    }
+    else {
+      printf("The info command need a parameter 'r' or 'w'\n");
+    }
+  }
+  return 0;
+}
 void ui_mainloop(int is_batch_mode) {
   if (is_batch_mode) {
     cmd_c(NULL);
