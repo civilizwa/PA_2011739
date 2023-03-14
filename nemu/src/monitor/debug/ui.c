@@ -117,6 +117,7 @@ static int cmd_info(char *args){
   }
   return 0;
 }
+
 static int cmd_x(char *args) {
   if (args == NULL) {
     printf("Input invalid command!\n");
@@ -124,11 +125,12 @@ static int cmd_x(char *args) {
   else {
     int num, addr, i;
     char *exp;
-    num = atoi(strtok(NULL, " "));
-    exp = strtok(NULL, " ");
-    addr = trans(exp);
+    num = atoi(strtok(NULL, " "));//获取打印地址数目
+    exp = strtok(NULL, " ");//获取起始地址
+    addr = trans(exp);//将字符串转为十进制整数
 
     for (i = 0; i < num; i++) {
+      //获取并输出内存地址
       printf("0x%x\n", vaddr_read(addr, 4));
       addr += 4;
     }
@@ -175,6 +177,7 @@ void ui_mainloop(int is_batch_mode) {
   }
 
 }
+//将字符串“0x100000”转换成十进制整数
 int trans(char *e) {
   int len, num, i, j;
   len = strlen(e);
