@@ -143,6 +143,8 @@ bool check_parentheses(int p, int q);
 int find_dominant_operator(int p, int q);
 int priority(int i);
 uint32_t eval(int p,int q);
+bool judge_exp();
+uint32_t getnum(char str);
 
 uint32_t expr(char *e, bool *success) {
   if (!make_token(e)) {
@@ -152,8 +154,22 @@ uint32_t expr(char *e, bool *success) {
 
   /* TODO: Insert codes to evaluate the expression. */
   //TODO();
-
-  return 0;
+  if(!judge_exp()){
+    *success=false;
+    return 0;
+  }
+  if(tokens[0].type=='-'){
+    tokens[0].type=NEG;
+  }
+  for(int i=1;i<nr_token;i++){
+    if(tokens[i].type=='-'){
+      if(tokens[i-1].type!=NUM&&tokens[i-1].type!=')'){
+        tokens[i].type=NEG;
+      }
+    }
+  }
+  *success=true;
+  return eval(0,nr_token-1);
 }
 
 bool check_parentheses(int p, int q) {
@@ -254,6 +270,15 @@ uint32_t eval(int p, int q) {
   }
   else {
     int op = find_dominant_operator(p, q);
+    int result;
+    switch(tokens[op].type){
+      case NEG:
+      return -eval(p+1,q);
+      case '!':
+      result=eval(p+1,q);
+      if(result!=0) return 0;
+      else return 1;
+    }
     //printf("op = %d\n", op);
     uint32_t val1 = eval(p, op - 1);
     uint32_t val2 = eval(op + 1, q);
@@ -281,4 +306,32 @@ uint32_t eval(int p, int q) {
     }
   }
   return 1;
+}
+
+bool judge_exp() {
+  int i, cnt;
+  
+  cnt = 0;
+  for (i = 0; i <= nr_token; i++) {
+    if (tokens[i].type == LBRACKET)
+      cnt++;
+    else if (tokens[i].type == RBRACKET)
+      cnt--;
+
+    if (cnt < 0)
+      return false;
+  }
+
+  return true;
+}
+
+uint32_t getnum(char str)
+{
+  if (str >= '0' && str <= '9') 
+    return str - '0';
+  else if (str >= 'a' && str <= 'f') 
+    return str - 'a' + 10;
+  else if (str >= 'A' && str <= 'F') 
+    return str - 'A' + 10;
+  return 0;
 }
