@@ -273,8 +273,6 @@ uint32_t expr(char *e, bool *success) {
 
   //*success = true;
   /* TODO: Insert codes to evaluate the expression. */
-  // TODO();  //什么鬼
-  //
   //printf("RESULT=%d\n",eval(0, nr_token-1));
 
   return eval(0, nr_token-1);
