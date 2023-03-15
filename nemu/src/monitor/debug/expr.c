@@ -28,7 +28,7 @@ static struct rule {
   {"\\+", '+'},         // plus
   {"==", TK_EQ},         // equal
   {"0[xX][0-9a-fA-F]+", HEX},   // hex number
-  {"[0-9]+", NUM},      // numbers
+  {"0|[1-9][0-9]*", NUM},      // numbers
   {"\\-", MINUS},       // minus
   {"\\*", MULTIPLY},    // multiply
   {"\\/", DIVIDE},      // divide
@@ -154,16 +154,13 @@ uint32_t expr(char *e, bool *success) {
 
   /* TODO: Insert codes to evaluate the expression. */
   //TODO();
-  if(!judge_exp()){
-    *success=false;
-    return 0;
-  }
-  if(tokens[0].type=='-'){
+  
+  if(tokens[0].type==MINUS){
     tokens[0].type=NEG;
   }
   for(int i=1;i<nr_token;i++){
-    if(tokens[i].type=='-'){
-      if(tokens[i-1].type!=NUM&&tokens[i-1].type!=')'){
+    if(tokens[i].type==MINUS){
+      if(tokens[i-1].type!=NUM&&tokens[i-1].type!=RBRACKET){
         tokens[i].type=NEG;
       }
     }
