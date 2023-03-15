@@ -5,10 +5,11 @@
  */
 #include <sys/types.h>
 #include <regex.h>
+#define BAD_EXP -1111
 
 enum {
   TK_NOTYPE = 256, TK_EQ,NUM, ADD, MINUS, MULTIPLY, DIVIDE, 
-  LBRACKET, RBRACKET, REG, HEX,AND, OR, NEQ
+  LBRACKET, RBRACKET, REG, HEX,AND, OR, NEQ,NEG
 
   /* TODO: Add more token types */
 
@@ -39,7 +40,8 @@ static struct rule {
   {"\\$eip", REG},
   {"&&", AND},          // and
   {"\\|\\|", OR},       // or
-  {"!=", NEQ}           // not equal
+  {"!=", NEQ},           // not equal
+  {"!",'!'}
 };
 
 #define NR_REGEX (sizeof(rules) / sizeof(rules[0]) )
@@ -140,6 +142,7 @@ static bool make_token(char *e) {
 bool check_parentheses(int p, int q);
 int find_dominant_operator(int p, int q);
 int priority(int i);
+uint32_t eval(int p,int q);
 
 uint32_t expr(char *e, bool *success) {
   if (!make_token(e)) {
@@ -163,7 +166,7 @@ bool check_parentheses(int p, int q) {
     if (tokens[i].type == RBRACKET) {
       bra--;//出现右括号,bra-1
     }
-    if(bra == 0 && i < q) {//若bra==0，输出true
+    if(bra == 0 && i < q) {
       return false;
     }
   }
@@ -202,10 +205,80 @@ int find_dominant_operator(int p, int q) {
 }
 
 int priority(int i) {
-  if (tokens[i].type == ADD || tokens[i].type == MINUS) return 4;
-  else if (tokens[i].type == MULTIPLY || tokens[i].type == DIVIDE) return 3;
-  else if (tokens[i].type == OR) return 12;
-  else if (tokens[i].type == AND) return 11;
-  else if (tokens[i].type == NEQ || tokens[i].type == TK_EQ) return 7;
+  if(tokens[i].type ==NEG||tokens[i].type =='!') return 1;
+  if (tokens[i].type == MULTIPLY || tokens[i].type == DIVIDE) return 2;
+  else if (tokens[i].type == ADD || tokens[i].type == MINUS) return 3;
+  else if (tokens[i].type == NEQ || tokens[i].type == TK_EQ) return 4;
+  else if (tokens[i].type == OR) return 5;
+  else if (tokens[i].type == AND) return 6;
+  
   return 0;
+}
+
+uint32_t eval(int p, int q) {
+//  printf("in the eval p = %d, q = %d\n", p, q);
+  if (p > q){
+    return BAD_EXP;
+  }
+  else if (p == q){
+    if (tokens[p].type == NUM) {
+      return atoi(tokens[p].str);
+    }
+    else if (tokens[p].type == REG) {
+      if (strcmp(tokens[p].str, "$eax") == 0){  
+        //printf("eax = %u\n", cpu.eax);
+        return cpu.eax;}
+      else if (strcmp(tokens[p].str, "$ebx") == 0)  return cpu.ebx;
+      else if (strcmp(tokens[p].str, "$ecx") == 0)  return cpu.ecx;
+      else if (strcmp(tokens[p].str, "$edx") == 0)  return cpu.edx;
+      else if (strcmp(tokens[p].str, "$ebp") == 0)  return cpu.ebp;
+      else if (strcmp(tokens[p].str, "$esp") == 0)  return cpu.esp;
+      else if (strcmp(tokens[p].str, "$esi") == 0)  return cpu.esi;
+      else if (strcmp(tokens[p].str, "$edi") == 0)  return cpu.edi;
+      else if (strcmp(tokens[p].str, "$eip") == 0)  return cpu.eip;
+    }
+    else if (tokens[p].type == HEX) {
+      int cnt, i, len, sum = 0;
+      len = strlen(tokens[p].str);
+      cnt = 1;
+
+      for (i = len-1; i >= 0; i--) {
+        sum = sum + cnt * getnum(tokens[p].str[i]);
+        cnt *= 16;
+      }
+      return sum;
+    }
+  }
+  else if (check_parentheses(p, q)){
+    return eval(p + 1, q - 1);
+  }
+  else {
+    int op = find_dominant_operator(p, q);
+    //printf("op = %d\n", op);
+    uint32_t val1 = eval(p, op - 1);
+    uint32_t val2 = eval(op + 1, q);
+    //printf("op = %d val1 = %u val2 = %u\n", op, val1, val2);
+
+    switch (tokens[op].type) {
+      case ADD:
+        return val1 + val2;
+      case MINUS:
+        return val1 - val2;
+      case MULTIPLY:
+        return val1 * val2;
+      case DIVIDE:
+        return val1 / val2;
+      case AND:
+        return val1 && val2;
+      case OR:
+        return val1 || val2;
+      case TK_EQ:
+        return val1 == val2;
+      case NEQ:
+        return val1 != val2;
+      default:
+        assert(0);
+    }
+  }
+  return 1;
 }
