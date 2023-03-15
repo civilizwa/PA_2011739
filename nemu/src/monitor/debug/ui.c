@@ -40,6 +40,7 @@ static int cmd_help(char *args);
 static int cmd_si(char *args);
 static int cmd_info(char *args);
 static int cmd_x(char *args);
+static int cmd_p(char *args);
 
 static struct {
   char *name;
@@ -138,6 +139,28 @@ static int cmd_x(char *args) {
   }
   return 0;
 }
+
+static int cmd_p(char *args) {
+  if (args == NULL) {
+    printf("Input invalid command! Please input the expression.\n");
+  }
+  else {
+    init_regex();
+
+    bool success = true;
+    //printf("args = %s\n", args);
+    int result = expr(args, &success);
+
+    if (success) {
+      printf("result = %d\n", result);
+    }
+    else {
+      printf("Invalid expression!\n");
+    }
+  }
+  return 0;
+}
+
 void ui_mainloop(int is_batch_mode) {
   if (is_batch_mode) {
     cmd_c(NULL);
