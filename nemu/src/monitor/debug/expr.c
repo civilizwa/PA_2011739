@@ -137,6 +137,7 @@ static bool make_token(char *e) {
 
   return true;
 }
+bool check_parentheses(int p, int q);
 
 uint32_t expr(char *e, bool *success) {
   if (!make_token(e)) {
@@ -148,4 +149,22 @@ uint32_t expr(char *e, bool *success) {
   //TODO();
 
   return 0;
+}
+
+bool check_parentheses(int p, int q) {
+  int i, bra = 0;//bra用于匹配左右括号
+
+  for (i = p; i <= q; i++) {
+    if (tokens[i].type == LBRACKET) {
+      bra++;//出现左括号，bra+1
+    }
+    if (tokens[i].type == RBRACKET) {
+      bra--;//出现右括号,bra-1
+    }
+    if(bra == 0 && i < q) {//若bra==0，输出true
+      return false;
+    }
+  }
+
+  return true;
 }
