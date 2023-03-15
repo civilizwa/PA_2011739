@@ -138,6 +138,7 @@ static bool make_token(char *e) {
   return true;
 }
 bool check_parentheses(int p, int q);
+int find_dominant_operator(int p, int q);
 
 uint32_t expr(char *e, bool *success) {
   if (!make_token(e)) {
@@ -167,4 +168,34 @@ bool check_parentheses(int p, int q) {
   }
 
   return true;
+}
+
+int find_dominant_operator(int p, int q) {
+  int i = 0, j, cnt;
+  int op = 0, opp, pos = -1;
+  for (i = p; i <= q; i++){
+    if (tokens[i].type == NUM || tokens[i].type == REG || tokens[i].type == HEX)
+      continue;
+    else if (tokens[i].type == LBRACKET) {
+      cnt = 0;
+      for (j = i + 1; j <= q; j++) {
+        if (tokens[j].type == RBRACKET) {
+          cnt++;
+          i += cnt;
+          break;
+        }
+        else
+          cnt++;
+      }
+    }
+    else {
+      opp = priority(i);
+      if (opp >= op) {
+        pos = i;
+        op = opp;
+      }
+    }
+  }
+//  printf("op = %d, pos = %d\n",  op, pos);
+  return pos;
 }
