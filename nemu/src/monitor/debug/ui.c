@@ -54,6 +54,7 @@ static struct {
   {"si","Let the program execute n steps",cmd_si},
   {"info", "Display the register status and the watchpoint information", cmd_info},
   {"x","Caculate the value of expression and display the content of the address",cmd_x},
+  { "p","Calculate an expression", cmd_p},
 };
 
 #define NR_CMD (sizeof(cmd_table) / sizeof(cmd_table[0]))
