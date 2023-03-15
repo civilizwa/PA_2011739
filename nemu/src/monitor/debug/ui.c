@@ -142,24 +142,13 @@ static int cmd_x(char *args) {
 }
 
 static int cmd_p(char *args) {
-  if (args == NULL) {
-    printf("Input invalid command! Please input the expression.\n");
-  }
-  else {
-    init_regex();
-
-    bool success = true;
-    //printf("args = %s\n", args);
-    int result = expr(args, &success);
-
-    if (success) {
-      printf("result = %d\n", result);
-    }
-    else {
-      printf("Invalid expression!\n");
-    }
-  }
-  return 0;
+  bool *success = false;
+	int i;
+	i = expr(args, success);
+	if (!success){
+		printf("%d\n", i);
+	}
+	return 0;
 }
 
 void ui_mainloop(int is_batch_mode) {
