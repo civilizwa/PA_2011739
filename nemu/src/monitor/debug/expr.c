@@ -139,6 +139,7 @@ static bool make_token(char *e) {
 }
 bool check_parentheses(int p, int q);
 int find_dominant_operator(int p, int q);
+int priority(int i);
 
 uint32_t expr(char *e, bool *success) {
   if (!make_token(e)) {
@@ -198,4 +199,13 @@ int find_dominant_operator(int p, int q) {
   }
 //  printf("op = %d, pos = %d\n",  op, pos);
   return pos;
+}
+
+int priority(int i) {
+  if (tokens[i].type == ADD || tokens[i].type == MINUS) return 4;
+  else if (tokens[i].type == MULTIPLY || tokens[i].type == DIVIDE) return 3;
+  else if (tokens[i].type == OR) return 12;
+  else if (tokens[i].type == AND) return 11;
+  else if (tokens[i].type == NEQ || tokens[i].type == TK_EQ) return 7;
+  return 0;
 }
