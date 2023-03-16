@@ -143,7 +143,6 @@ WP* get_wp(int n){
 //   return changed;
 // }
 bool check_wp(){
-  printf("触发check\n");
 	bool check = false;
 	bool *success = false;
 	WP *temp = head;
