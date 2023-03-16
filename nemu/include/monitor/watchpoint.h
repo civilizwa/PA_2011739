@@ -17,5 +17,5 @@ WP* new_wp();
 void free_wp(WP *wp);
 bool check_wp();
 void display_wp();
-WP* get_wp(char* args);
+WP* get_wp(int n);
 #endif

@@ -174,14 +174,16 @@ static int cmd_d(char *args){
     printf("empty of parameter!\n");
     return 0;
   }
-  WP *wp=get_wp(args);
+  int n;
+  sscanf(args,"%d",&n);
+  WP *wp=get_wp(n);
   if(wp==NULL){
     printf("There is no watchpoint called this name\n");
     return 0;
   }
   else{
     free_wp(wp);
-    printf("This watchpoint has been deleted!\n");
+    printf("Delete watchpoint %d: %s\n", wp->NO, wp->exp);
   }
   return 0;
 }
