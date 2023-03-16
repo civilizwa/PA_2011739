@@ -29,19 +29,19 @@ WP* new_wp() {
   }
   WP *wp = free_;
   if(head==NULL){
+    free_=free_->next;
     head=wp;
     wp->next=NULL;
     wp->before=NULL;
-    free_=free_->next;
   }
   else{
+    free_ = free_->next;
     WP *tmp=head;
     while(tmp->next!=NULL){
       tmp=tmp->next;
     }
     tmp->next=wp;//尾部插入wp
     wp->before=tmp;//wp的前监视点是tmp
-    free_ = free_->next;
     wp->next = NULL;
   }
   return wp;
