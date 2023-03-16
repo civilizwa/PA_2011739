@@ -42,6 +42,7 @@ static int cmd_info(char *args);
 static int cmd_x(char *args);
 static int cmd_p(char *args);
 static int cmd_w(char *args);
+static int cmd_d(char *args);
 
 static struct {
   char *name;
@@ -57,6 +58,7 @@ static struct {
   {"x","Caculate the value of expression and display the content of the address",cmd_x},
   { "p","Calculate an expression", cmd_p},
   {"w","Set watchpoint",cmd_w},
+  {"d","Delete certain watchpoint",cmd_d},
 };
 
 #define NR_CMD (sizeof(cmd_table) / sizeof(cmd_table[0]))
@@ -163,6 +165,24 @@ static int cmd_w(char *args){
   strcpy(wp->exp,args);
   wp->value=expr(args,success);
   printf("Set watchpoint %d on %s\n",wp->NO,args);
+  return 0;
+}
+
+static int cmd_d(char *args){
+  //从head监视点中获取对应的wp
+  if(args==NULL){
+    printf("empty of parameter!\n");
+    return 0;
+  }
+  WP *wp=get_wp(args);
+  if(wp==NULL){
+    printf("There is no watchpoint called this name\n");
+    return 0;
+  }
+  else{
+    free_wp(wp);
+    printf("This watchpoint has been deleted!\n");
+  }
   return 0;
 }
 

@@ -66,6 +66,17 @@ void free_wp(WP *wp){
   }
   
 }
+WP* get_wp(char* args){
+  WP *cur=head;
+  while (cur!=NULL)
+  {
+    if(cur->exp==args){
+      return cur;
+    }
+    cur=cur->next;
+  }
+  return NULL;
+}
 
 bool check_wp(){
   WP *tmp=head;
