@@ -49,9 +49,19 @@ WP* new_wp() {
 
 void free_wp(WP *wp){
   //将wp从head删除
-  wp->before->next=wp->next;
-  wp->next->before=wp->before;
-  //在free_尾部添加wp
+  if(wp->before==NULL){
+    //wp是head
+    head=wp->next;
+  }
+  else if(wp->next==NULL){
+    //wp是最后一个
+    wp->before->next=NULL;
+  }
+  else{
+    wp->before->next=wp->next;
+    wp->next->before=wp->before;
+  }
+  //在free_添加wp
   WP *cur=free_;
   if(free_==NULL){
     free_=wp;
