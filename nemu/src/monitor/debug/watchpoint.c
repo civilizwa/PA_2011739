@@ -7,6 +7,7 @@ static WP wp_pool[NR_WP];
 static WP *head, *free_;
 WP* new_wp();
 void free_wp(WP *wp);
+
 void init_wp_pool() {
   int i;
   for (i = 0; i < NR_WP; i ++) {
@@ -26,13 +27,25 @@ WP* new_wp() {
   if (free_ == NULL) {
     assert(0);
   }
-
   WP *wp = free_;
-  free_ = free_->next;
-  wp->next = NULL;
+  if(head==NULL){
+    head=wp;
+    wp->next=NULL;
+    free_=free_->next;
+  }
+  else{
+    WP *tmp=head;
+    while(tmp->next!=NULL){
+      tmp=tmp->next;
+    }
+    tmp->next=wp;//尾部插入wp
+    free_ = free_->next;
+    wp->next = NULL;
+  }
 
   return wp;
 }
+
 void free_wp(WP *wp){
   WP *cur=free_;
   while(cur->next!=NULL){
