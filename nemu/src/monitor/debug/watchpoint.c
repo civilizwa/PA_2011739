@@ -5,8 +5,6 @@
 
 static WP wp_pool[NR_WP];
 static WP *head, *free_;
-WP* new_wp();
-void free_wp(WP *wp);
 
 void init_wp_pool() {
   int i;
@@ -67,6 +65,24 @@ void free_wp(WP *wp){
     wp->next=NULL;
   }
   
+}
+
+bool check_wp(){
+  WP *tmp=head;
+  bool changed=false;
+  while(tmp!=NULL){
+    bool *success=false;
+    uint32_t new_value=expr(tmp->exp,success);
+    if(new_value!=tmp->value){
+      printf("Watchpoint %d: %s has changed.\n",tmp->NO,tmp->exp);
+      printf("Old Value:0x%08x\n",tmp->value);
+      printf("New Value:0x%08x\n",new_value);
+      tmp->value=new_value;
+      changed=true;
+    }
+    tmp=tmp->next;
+  }
+  return changed;
 }
 
 void display_wp() {

@@ -41,6 +41,7 @@ static int cmd_si(char *args);
 static int cmd_info(char *args);
 static int cmd_x(char *args);
 static int cmd_p(char *args);
+static int cmd_w(char *args);
 
 static struct {
   char *name;
@@ -55,6 +56,7 @@ static struct {
   {"info", "Display the register status and the watchpoint information", cmd_info},
   {"x","Caculate the value of expression and display the content of the address",cmd_x},
   { "p","Calculate an expression", cmd_p},
+  {"w","Set watchpoint",cmd_w},
 };
 
 #define NR_CMD (sizeof(cmd_table) / sizeof(cmd_table[0]))
@@ -149,6 +151,19 @@ static int cmd_p(char *args) {
 		printf("%d\n", i);
 	}
 	return 0;
+}
+
+static int cmd_w(char *args){
+  if(args==NULL){
+    printf("empty of parameters!\n");
+    return 0;
+  }
+  bool *success=false;
+  WP* wp=new_wp();
+  strcpy(wp->exp,args);
+  wp->value=expr(args,success);
+  printf("Set watchpoint %d on %s\n",wp->NO,args);
+  return 0;
 }
 
 void ui_mainloop(int is_batch_mode) {
