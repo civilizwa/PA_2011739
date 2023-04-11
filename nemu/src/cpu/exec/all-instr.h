@@ -55,3 +55,13 @@ make_EHelper(shl);
 make_EHelper(not);
 make_EHelper(shr);
 make_EHelper(rol);
+
+// special.c
+make_EHelper(nop); 
+
+// system.c
+make_EHelper(in); 
+make_EHelper(out); 
+make_EHelper(lidt);
+make_EHelper(int); 
+make_EHelper(iret);
