@@ -249,7 +249,14 @@ void exec_wrapper(bool print_flag) {
   update_eip();
 
 #ifdef DIFF_TEST
-  void difftest_step(uint32_t);
-  difftest_step(eip);
+  bool difftest_step(uint32_t);
+  bool curr_asm=difftest_step(eip);
+  if(curr_asm);
 #endif
+
+#ifdef DEBUG
+  if(curr_asm)
+      printf("error in%s\n", decoding.asm_buf);
+#endif
+
 }
