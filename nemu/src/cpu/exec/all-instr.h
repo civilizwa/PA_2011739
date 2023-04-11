@@ -43,3 +43,15 @@ make_EHelper(imul1);
 make_EHelper(idiv);
 make_EHelper(div);
 make_EHelper(neg);
+
+// logic.c
+make_EHelper(xor); 
+make_EHelper(and); 
+make_EHelper(or); 
+make_EHelper(setcc); 
+make_EHelper(test); 
+make_EHelper(sar);
+make_EHelper(shl);
+make_EHelper(not);
+make_EHelper(shr);
+make_EHelper(rol);
