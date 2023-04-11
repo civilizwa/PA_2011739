@@ -6,13 +6,14 @@ make_EHelper(mov) {
 }
 
 make_EHelper(push) {
-  TODO();
+  rtl_push(&id_dest->val); 
 
   print_asm_template1(push);
 }
 
 make_EHelper(pop) {
-  TODO();
+  rtl_pop(&t0); //这里只能弹出到rtlreg_t*里,不能直接弹到Operand*里
+  operand_write(id_dest,&t0); //Operand* rtlreg_t* (decode.c)
 
   print_asm_template1(pop);
 }
