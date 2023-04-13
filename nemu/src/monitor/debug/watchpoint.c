@@ -1,117 +1,178 @@
 #include "monitor/watchpoint.h"
 #include "monitor/expr.h"
+#include "nemu.h"
 
 #define NR_WP 32
 
-static WP wp_pool[NR_WP];  // watchpoint pool
+static WP wp_pool[NR_WP];
 static WP *head, *free_;
-static int used_next;
-static WP *wptemp;
 
 void init_wp_pool() {
   int i;
   for (i = 0; i < NR_WP; i ++) {
     wp_pool[i].NO = i;
     wp_pool[i].next = &wp_pool[i + 1];
+    wp_pool[i].before=&wp_pool[i-1];
+    wp_pool[i].exp[0] = '\0';
+    wp_pool[i].value = -1;
   }
+  wp_pool[0].before=NULL;
   wp_pool[NR_WP - 1].next = NULL;
 
   head = NULL;
   free_ = wp_pool;
-  used_next = 0;
 }
 
-bool new_wp(char *args) {
-    if (free_ == NULL) {
-        printf("no wp left\n");
-        assert(0);
-    }
-    WP *result = free_;
-    free_ = free_->next;
-
-    result->NO = used_next++;
-    result->next = NULL;
-    strcpy(result->e, args);
-    result->hitNum = 0;
-
-    bool success;
-    result->oldValue = expr(result->e, &success);
-    if (success == false) {
-        printf("error in new_wp: expression fault!\n");
-        return false;
-    }
-
-    wptemp = head;
-    if (wptemp == NULL) {
-        head = result;
-    } else {
-        while (wptemp->next != NULL)
-            wptemp = wptemp->next;
-        wptemp->next = result;
-    }
-    printf("success: set wp %d, oldValue=%d\n", result->NO, result->oldValue);
-    return true;
+/* TODO: Implement the functionality of watchpoint */
+// WP* new_wp() {
+//   if (free_ == NULL) {
+//     assert(0);
+//   }
+//   WP *wp = free_;
+//   if(head==NULL){
+//     free_=free_->next;
+//     head=wp;
+//     wp->next=NULL;
+//     wp->before=NULL;
+//   }
+//   else{
+//     free_ = free_->next;
+//     WP *tmp=head;
+//     while(tmp->next!=NULL){
+//       tmp=tmp->next;
+//     }
+//     tmp->next=wp;//尾部插入wp
+//     wp->before=tmp;//wp的前监视点是tmp
+//     wp->next = NULL;
+//   }
+//   return wp;
+// }
+WP* new_wp(){
+	WP *temp;
+	temp = free_;
+	free_ = free_->next;
+	temp->next = NULL;
+	if (head == NULL){
+		head = temp;
+	} else {
+		WP* temp2;
+		temp2 = head;
+		while (temp2->next != NULL){
+			temp2 = temp2->next;
+		}
+		temp2->next = temp;
+	}
+	return temp;
 }
 
-bool free_wp(int num) {
-    WP *thewp = NULL;
-    if (head == NULL) {
-        printf("no watchpoint now\n");
-        return false;
-    }
-    if (head->NO == num) {
-        thewp = head;
-        head = head->next;
-    } else {
-        wptemp = head;
-        while (wptemp != NULL && wptemp->next != NULL) {
-            if (wptemp->next->NO == num) {
-                thewp = wptemp->next;
-                wptemp->next = wptemp->next->next;
-                break;
-            }
-            wptemp = wptemp->next;
-        }//while
-    }//else
-    if (thewp != NULL) {
-        thewp->next = free_;
-        free_ = thewp;
-        return true;
-    }
-    return false;
+
+// void free_wp(WP *wp){
+//   //将wp从head删除
+//   if(wp->before==NULL){
+//     //wp是head
+//     head=wp->next;
+//   }
+//   else if(wp->next==NULL){
+//     //wp是最后一个
+//     wp->before->next=NULL;
+//   }
+//   else{
+//     wp->before->next=wp->next;
+//     wp->next->before=wp->before;
+//   }
+//   //在free_添加wp
+//   WP *cur=free_;
+//   if(free_==NULL){
+//     free_=wp;
+//     wp->next=NULL;
+//   }
+//   else{
+//     while(cur->next!=NULL){
+//       cur=cur->next;
+//     }
+//     cur->next=wp;
+//     wp->next=NULL;
+//   } 
+//}
+void free_wp(WP *wp){
+	if (wp == NULL){
+		assert(0);
+	}
+	if (wp == head){
+		head = head->next;
+	} else {
+		WP* temp = head;
+		while (temp != NULL && temp->next != wp){
+			temp = temp->next;
+		}
+		temp->next = temp->next->next;
+	}
+	wp->next =free_;
+	free_ = wp;
+	wp->value = 0;
+	wp->exp[0] = '\0';
 }
 
-void print_wp() {
-    if (head == NULL) {
-        printf("no watchpoint now\n");
-        return;
+WP* get_wp(int n){
+  WP *cur=head;
+  while (cur!=NULL)
+  {
+    if(cur->NO==n){
+      return cur;
     }
-    printf("Watchpoint(s):\n");
-    printf("NO.\texpr\t\thitTimes\n");
-    wptemp = head;
-    while (wptemp != NULL) {
-        printf("%d\t%s\t\t%d\n", wptemp->NO, wptemp->e, wptemp->hitNum);
-        wptemp = wptemp->next;
-    }
+    cur=cur->next;
+  }
+  return NULL;
 }
 
-bool watch_wp() {
-    bool success;
-    int result;
-    if (head == NULL)
-        return true;  // don't stop
-    
-    wptemp = head;
-    while (wptemp != NULL) {
-        result = expr(wptemp->e, &success);  // already detected in new_wp(), success is true
-        if (result != wptemp->oldValue) {
-            wptemp->hitNum += 1;
-            printf("Hardware watchpoint %d: %s\n", wptemp->NO, wptemp->e);
-            printf("Old value:%d\nNew value:%d\n\n", wptemp->oldValue, result);
-            wptemp->oldValue = result;
-            return false;  // stop executing
-        }
-        wptemp = wptemp->next;
-    }
-    return true;  // nothing changed, don't stop
+// bool check_wp(){
+//   WP *tmp=head;
+//   bool changed=false;
+//   while(tmp!=NULL){
+//     bool *success=false;
+//     uint32_t new_value=expr(tmp->exp,success);
+//     if(new_value!=tmp->value){
+//       printf("Watchpoint %d: %s has changed.\n",tmp->NO,tmp->exp);
+//       printf("Old Value:0x%08x\n",tmp->value);
+//       printf("New Value:0x%08x\n",new_value);
+//       tmp->value=new_value;
+//       changed=true;
+//     }
+//     tmp=tmp->next;
+//   }
+//   return changed;
+// }
+bool check_wp(){
+	bool check = false;
+	bool *success = false;
+	WP *temp = head;
+	int expr_temp;
+	while(temp != NULL){
+		expr_temp = expr(temp->exp, success);
+		if (expr_temp != temp->value){
+			check = true;
+			printf ("Hint watchpoint %d at address 0x%08x\n", temp->NO, cpu.eip);
+			temp = temp->next;
+			continue;
+		}
+		printf ("Watchpoint %d: %s\n",temp->NO,temp->exp);
+		printf ("Old value = %d\n",temp->value);
+		printf ("New value = %d\n",expr_temp);
+		temp->value = expr_temp;
+		temp = temp->next;
+	}
+	return check;
 }
+
+void display_wp() {
+  WP *temp = head;
+	if (temp == NULL){
+		printf("No watchpoints\n");
+	}
+	while (temp != NULL){
+		printf("Watch point %d: %s\n", temp->NO, temp->exp);
+		temp = temp->next;
+	}
+}
+
+

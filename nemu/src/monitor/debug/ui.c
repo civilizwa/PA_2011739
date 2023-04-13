@@ -8,7 +8,7 @@
 #include <readline/history.h>
 
 void cpu_exec(uint64_t);
-
+void display_wp();
 /* We use the `readline' library to provide more flexibility to read from stdin. */
 char* rl_gets() {
   static char *line_read = NULL;
@@ -37,116 +37,12 @@ static int cmd_q(char *args) {
 }
 
 static int cmd_help(char *args);
-
-static int cmd_si(char *args) {
-    uint64_t N = 0;
-    if (args == NULL) 
-        N = 1;
-    else {
-        int nRet = sscanf(args, "%llu", &N);
-        if (nRet <= 0) {
-            printf("args error in cmd_si\n");
-            return 0;
-        }
-    }
-    cpu_exec(N);
-    return 0;
-}
-
-static int cmd_info(char *args) {
-    char s;
-    if (args == NULL) {
-        printf("args error in cmd_info\n");
-        return 0;
-    }
-
-    int nRet = sscanf(args, "%c", &s);
-    if (nRet <= 0) {
-        printf("args error in cmd_info\n");
-        return 0;
-    }
-    if (s == 'r') {
-        int i;
-        for (i = 0; i < 8; i++) 
-            printf("%s 0x%x\n", regsl[i], reg_l(i));        
-        printf("eip 0x%x\n", cpu.eip);
-        for (i = 0; i < 8; i++)
-            printf("%s 0x%x\n", regsw[i], reg_w(i));
-        for (i = 0; i < 8; i++) 
-            printf("%s 0x%x\n", regsb[i], reg_b(i));
-        printf("cr0=0x%x,cr3=0x%x\n",cpu.CR0,cpu.CR3);
-        return 0;
-    }
-    if (s == 'w') {
-        print_wp();
-        return 0;
-    }
-    else {
-        printf("args error in cmd_info\n");
-        return 0;
-    }
-}
-
-static int cmd_x(char *args) {
-    int nLen = 0;
-    bool success;
-    int j; for (j = 0; args[j] != ' '; j++);
-    char* e = (char*)malloc(strlen(args + j + 1));  // expression
-
-    int nRet = sscanf(args, "%d %s", &nLen, e);
-    if (nRet <= 0) {
-        printf("args error in cmd_x\n");
-        return 0;
-    }
-
-    vaddr_t addr = expr(e, &success);
-    if (success == false) {
-        printf("error in expr()\n");
-        return 0;
-    }
-
-    printf("Memory from %d(0x%x): ", addr, addr);
-    int i;
-    for (i = 0; i < nLen; i++) {
-        if (i % 4 == 0)
-            printf("\n0x%x:  0x%02x", addr + i, vaddr_read(addr + i, 1));
-        else
-            printf("  0x%02x", vaddr_read(addr + i, 1));
-    }
-    printf("\n");
-    return 0;
-}
-
-static int cmd_p(char *args) {
-    bool success;
-    int res = expr(args, &success);
-    if (success == false) {
-        printf("error in expr()\n");
-    } else
-        printf("value of expr: %d\n", res);
-    return 0;
-}
-
-static int cmd_w(char *args) {
-    new_wp(args);
-    return 0;
-}
-
-static int cmd_d(char *args) {
-    int num;
-    int nRet = sscanf(args, "%d", &num);
-    if (nRet <= 0) {
-        printf("args error in cmd_d\n");
-        return 0;
-    }
-
-    int r = free_wp(num);
-    if (r == false)
-        printf("error: no watchpoint %d\n", num);
-    else
-        printf("watchpoint %d successfully deleted\n", num);
-    return 0;
-}
+static int cmd_si(char *args);
+static int cmd_info(char *args);
+static int cmd_x(char *args);
+static int cmd_p(char *args);
+static int cmd_w(char *args);
+static int cmd_d(char *args);
 
 static struct {
   char *name;
@@ -156,13 +52,13 @@ static struct {
   { "help", "Display informations about all supported commands", cmd_help },
   { "c", "Continue the execution of the program", cmd_c },
   { "q", "Exit NEMU", cmd_q },
-  { "si", "args: [N]; execute [N] instructions step by step", cmd_si },
-  { "info", "args: r/w; print information about registers or watchpoint", cmd_info },
-  { "x", "x [N] [EXPR]; scan the memory", cmd_x },
-  { "p", "expr", cmd_p },
-  { "w", "set the watchpoint", cmd_w },
-  { "d", "delete the watchpoint", cmd_d },
   /* TODO: Add more commands */
+  {"si","Let the program execute n steps",cmd_si},
+  {"info", "Display the register status and the watchpoint information", cmd_info},
+  {"x","Caculate the value of expression and display the content of the address",cmd_x},
+  { "p","Calculate an expression", cmd_p},
+  {"w","Set watchpoint",cmd_w},
+  {"d","Delete certain watchpoint",cmd_d},
 };
 
 #define NR_CMD (sizeof(cmd_table) / sizeof(cmd_table[0]))
@@ -186,6 +82,108 @@ static int cmd_help(char *args) {
       }
     }
     printf("Unknown command '%s'\n", arg);
+  }
+  return 0;
+}
+static int cmd_si(char *args){
+  //调用strtok获取执行步数
+  int steps;
+  //无参默认1步
+  if(args==NULL){
+    steps=1;
+  }
+  else{
+    //Divide S into tokens separated by characters in DELIM.
+    steps=atoi(strtok(NULL," "));
+  }
+  cpu_exec(steps);
+  return 0;
+}
+static int cmd_info(char *args){
+  if (args == NULL) {
+    printf("Please input the info r or info w\n");
+  }
+  else {
+    if (strcmp(args, "r") == 0) {
+      printf("eax:  0x%-10x    %-10d\n", cpu.eax, cpu.eax);
+      printf("edx:  0x%-10x    %-10d\n", cpu.edx, cpu.edx);
+      printf("ecx:  0x%-10x    %-10d\n", cpu.ecx, cpu.ecx);
+      printf("ebx:  0x%-10x    %-10d\n", cpu.ebx, cpu.ebx);
+      printf("ebp:  0x%-10x    %-10d\n", cpu.ebp, cpu.ebp);
+      printf("esi:  0x%-10x    %-10d\n", cpu.esi, cpu.esi);
+      printf("esp:  0x%-10x    %-10d\n", cpu.esp, cpu.esp);
+      printf("eip:  0x%-10x    %-10d\n", cpu.eip, cpu.eip);
+    }
+    else if (strcmp(args, "w") == 0) {
+      display_wp();
+    }
+    else {
+      printf("The info command need a parameter 'r' or 'w'\n");
+    }
+  }
+  return 0;
+}
+
+static int cmd_x(char *args) {
+  if (args == NULL) {
+    printf("Input invalid command!\n");
+  }
+  else {
+    int num, addr, i;
+    char *exp;
+    num = atoi(strtok(NULL, " "));//获取打印地址数目
+    exp = strtok(NULL, " ");//获取起始地址
+    addr = trans(exp);//将字符串转为十进制整数
+
+    for (i = 0; i < num; i++) {
+      //获取并输出内存地址
+      printf("0x%x\n", vaddr_read(addr, 4));
+      addr += 4;
+    }
+
+  }
+  return 0;
+}
+
+static int cmd_p(char *args) {
+  bool *success = false;
+	int i;
+	i = expr(args, success);
+	if (!success){
+		printf("%d\n", i);
+	}
+	return 0;
+}
+
+static int cmd_w(char *args){
+  if(args==NULL){
+    printf("empty of parameters!\n");
+    return 0;
+  }
+  bool *success=false;
+  WP* wp=new_wp();
+  strcpy(wp->exp,args);
+  wp->value=expr(args,success);
+  printf("Set watchpoint %d on %s\n",wp->NO,args);
+  return 0;
+}
+
+static int cmd_d(char *args){
+  //从head监视点中获取对应的wp
+  if(args==NULL){
+    printf("empty of parameter!\n");
+    return 0;
+  }
+  int n;
+  sscanf(args,"%d",&n);
+  WP *wp=get_wp(n);
+  if(wp==NULL){
+    printf("There is no watchpoint called this name\n");
+    return 0;
+  }
+  else{
+    free_wp(wp);
+    printf("Delete watchpoint %d: %s\n", wp->NO, wp->exp);
   }
   return 0;
 }
@@ -227,4 +225,20 @@ void ui_mainloop(int is_batch_mode) {
 
     if (i == NR_CMD) { printf("Unknown command '%s'\n", cmd); }
   }
+
+}
+//将字符串“0x100000”转换成十进制整数
+int trans(char *e) {
+  int len, num, i, j;
+  len = strlen(e);
+  num = 0;
+  j = 1;
+
+  for (i = len-1; i > 1; i--) {
+    num += (e[i]-'0')*j;
+    j *= 16;
+  }
+//  printf("num = %d\n", num);
+
+  return num;
 }

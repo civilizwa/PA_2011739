@@ -29,8 +29,11 @@ void cpu_exec(uint64_t n) {
     exec_wrapper(print_flag);
 
 #ifdef DEBUG
-    if (watch_wp() == false)
-        nemu_state = NEMU_STOP;
+    /* TODO: check watchpoints here. */
+    if(check_wp()){//值发生变动，触发暂停
+      nemu_state=NEMU_STOP;
+    }
+
 #endif
 
 #ifdef HAS_IOE
