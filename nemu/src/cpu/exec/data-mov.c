@@ -6,22 +6,21 @@ make_EHelper(mov) {
 }
 
 make_EHelper(push) {
-	if (id_dest->width == 1) {
-		id_dest->val = (int32_t)(int8_t)id_dest->val;
-	}
-	rtl_push(&id_dest->val);
+  rtl_push(&id_dest->val); 
+
   print_asm_template1(push);
 }
 
 make_EHelper(pop) {
-	rtl_pop(&t0);
-	operand_write(id_dest, &t0);
+  rtl_pop(&t0); //这里只能弹出到rtlreg_t*里,不能直接弹到Operand*里
+  operand_write(id_dest,&t0); //Operand* rtlreg_t* (decode.c)
+
   print_asm_template1(pop);
 }
 
 make_EHelper(pusha) {
-	t0 = cpu.esp;
-	rtl_push(&cpu.eax);
+  t0 = cpu.esp;
+  rtl_push(&cpu.eax);
   rtl_push(&cpu.ecx);
   rtl_push(&cpu.edx);
   rtl_push(&cpu.ebx);
@@ -30,65 +29,55 @@ make_EHelper(pusha) {
   rtl_push(&cpu.esi);
   rtl_push(&cpu.edi);
 
-	print_asm("pusha");
+  print_asm("pusha");
 }
 
 make_EHelper(popa) {
-	rtl_pop(&cpu.edi);
-	rtl_pop(&cpu.esi);
+  rtl_pop(&cpu.edi);
+  rtl_pop(&cpu.esi);
   rtl_pop(&cpu.ebp);
-  rtl_pop(&t0);
+  rtl_pop(&t0);  //throwaway esp
   rtl_pop(&cpu.ebx);
   rtl_pop(&cpu.edx);
   rtl_pop(&cpu.ecx);
   rtl_pop(&cpu.eax);
-
   print_asm("popa");
 }
 
 make_EHelper(leave) {
-	rtl_mv(&cpu.esp, &cpu.ebp);
-	rtl_pop(&cpu.ebp);
-
+  rtl_mv(&cpu.esp,&cpu.ebp);
+  rtl_pop(&cpu.ebp);
   print_asm("leave");
 }
-
 make_EHelper(cltd) {
   if (decoding.is_operand_size_16) {
-  	rtl_lr(&t0, R_AX, 2);
-		if ((int32_t)(int16_t)(uint16_t)t0 < 0) {
-			rtl_addi(&t1, &tzero, 0xffff);
-			rtl_sr(R_DX, 2, &t1);
-		}
-		else {
-			rtl_sr(R_DX, 2, &tzero);
-		}
-	}
+    //CWD
+    rtl_msb(&t0,&cpu.eax,2);
+    if(t0 == 1)cpu.edx = cpu.edx | 0xffff;
+    else cpu.edx = 0;
+  }
   else {
-    rtl_lr(&t0, R_EAX, 4);
-		if ((int32_t)t0 < 0) {
-			rtl_addi(&t1, &tzero, 0xffffffff);
-			rtl_sr(R_EDX, 4, &t1);
-		}
-		else {
-			rtl_sr(R_EDX, 4, &tzero);
-		}
+    //CDQ
+    rtl_msb(&t0,&cpu.eax,4);
+    if(t0 == 1)cpu.edx = cpu.edx | 0xffffffff;
+    else cpu.edx = 0;
   }
 
   print_asm(decoding.is_operand_size_16 ? "cwtl" : "cltd");
 }
 
+
 make_EHelper(cwtl) {
   if (decoding.is_operand_size_16) {
-  	rtl_lr(&t0, R_AL, 1);
-    t0 = (int16_t)(int8_t)(uint8_t)t0;
-    rtl_sr(R_AX, 2, &t0);
-	}
+    //CBW
+    rtl_sext(&t0,&cpu.eax,1);
+    cpu.eax = (cpu.eax & 0xffff0000) | (t0 & 0xffff);
+  }
   else {
-	  rtl_lr(&t0, R_AX, 2);
-    t0 = (int32_t)(int16_t)(uint16_t)t0;
-    rtl_sr(R_EAX, 4, &t0);
-	}
+    //CWDE
+    rtl_sext(&t0,&cpu.eax,2);
+    cpu.eax = t0;
+  }
 
   print_asm(decoding.is_operand_size_16 ? "cbtw" : "cwtl");
 }
