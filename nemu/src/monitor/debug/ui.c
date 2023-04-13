@@ -7,8 +7,15 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
+int trans(char *e);
 void cpu_exec(uint64_t);
+void init_regex();
 void display_wp();
+void insert_wp(char *args);
+void delete_wp(int no);
+uint32_t expr(char *e, bool *success);
+uint32_t vaddr_read(vaddr_t addr, int len);
+
 /* We use the `readline' library to provide more flexibility to read from stdin. */
 char* rl_gets() {
   static char *line_read = NULL;
@@ -52,13 +59,13 @@ static struct {
   { "help", "Display informations about all supported commands", cmd_help },
   { "c", "Continue the execution of the program", cmd_c },
   { "q", "Exit NEMU", cmd_q },
-  /* TODO: Add more commands */
-  {"si","Let the program execute n steps",cmd_si},
-  {"info", "Display the register status and the watchpoint information", cmd_info},
-  {"x","Caculate the value of expression and display the content of the address",cmd_x},
+  { "si", "Let the program execute n steps", cmd_si },
+  { "info", "Display the register status and the watchpoint information", cmd_info},
+  { "x", "Caculate the value of expression and display the content of the address", cmd_x},
   { "p","Calculate an expression", cmd_p},
-  {"w","Set watchpoint",cmd_w},
-  {"d","Delete certain watchpoint",cmd_d},
+  { "w", "Create a watchpoint", cmd_w},
+  { "d", "Delete a watchpoint", cmd_d},
+  /* TODO: Add more commands */
 };
 
 #define NR_CMD (sizeof(cmd_table) / sizeof(cmd_table[0]))
@@ -66,6 +73,7 @@ static struct {
 static int cmd_help(char *args) {
   /* extract the first argument */
   char *arg = strtok(NULL, " ");
+  //printf("111%s\n%s\n", args, arg);
   int i;
 
   if (arg == NULL) {
@@ -85,21 +93,22 @@ static int cmd_help(char *args) {
   }
   return 0;
 }
-static int cmd_si(char *args){
-  //调用strtok获取执行步数
+
+static int cmd_si(char *args) {
+  /*get the steps number*/
   int steps;
-  //无参默认1步
-  if(args==NULL){
-    steps=1;
+  if (args == NULL){
+    steps = 1;
   }
   else{
-    //Divide S into tokens separated by characters in DELIM.
-    steps=atoi(strtok(NULL," "));
+    steps = atoi(strtok(NULL, " "));
   }
+
   cpu_exec(steps);
   return 0;
 }
-static int cmd_info(char *args){
+
+static int cmd_info(char *args) {
   if (args == NULL) {
     printf("Please input the info r or info w\n");
   }
@@ -131,12 +140,11 @@ static int cmd_x(char *args) {
   else {
     int num, addr, i;
     char *exp;
-    num = atoi(strtok(NULL, " "));//获取打印地址数目
-    exp = strtok(NULL, " ");//获取起始地址
-    addr = trans(exp);//将字符串转为十进制整数
+    num = atoi(strtok(NULL, " "));
+    exp = strtok(NULL, " ");
+    addr = trans(exp);
 
     for (i = 0; i < num; i++) {
-      //获取并输出内存地址
       printf("0x%x\n", vaddr_read(addr, 4));
       addr += 4;
     }
@@ -146,44 +154,43 @@ static int cmd_x(char *args) {
 }
 
 static int cmd_p(char *args) {
-  bool *success = false;
-	int i;
-	i = expr(args, success);
-	if (!success){
-		printf("%d\n", i);
-	}
-	return 0;
-}
-
-static int cmd_w(char *args){
-  if(args==NULL){
-    printf("empty of parameters!\n");
-    return 0;
+  if (args == NULL) {
+    printf("Input invalid command! Please input the expression.\n");
   }
-  bool *success=false;
-  WP* wp=new_wp();
-  strcpy(wp->exp,args);
-  wp->value=expr(args,success);
-  printf("Set watchpoint %d on %s\n",wp->NO,args);
+  else {
+    init_regex();
+
+    bool success = true;
+    //printf("args = %s\n", args);
+    int result = expr(args, &success);
+
+    if (success) {
+      printf("result = %d\n", result);
+    }
+    else {
+      printf("Invalid expression!\n");
+    }
+  }
   return 0;
 }
 
-static int cmd_d(char *args){
-  //从head监视点中获取对应的wp
-  if(args==NULL){
-    printf("empty of parameter!\n");
-    return 0;
+static int cmd_w(char *args) {
+  if (args == NULL) {
+    printf("Input invalid command! Please input the expression.\n");
   }
-  int n;
-  sscanf(args,"%d",&n);
-  WP *wp=get_wp(n);
-  if(wp==NULL){
-    printf("There is no watchpoint called this name\n");
-    return 0;
+  else {
+    insert_wp(args);
   }
-  else{
-    free_wp(wp);
-    printf("Delete watchpoint %d: %s\n", wp->NO, wp->exp);
+  return 0;
+}
+
+static int cmd_d(char *args) {
+  if (args == NULL) {
+    printf("Input invalid command! Please input the NO.\n");
+  }
+  else {
+    int no = atoi(args);
+    delete_wp(no);
   }
   return 0;
 }
@@ -225,9 +232,8 @@ void ui_mainloop(int is_batch_mode) {
 
     if (i == NR_CMD) { printf("Unknown command '%s'\n", cmd); }
   }
-
 }
-//将字符串“0x100000”转换成十进制整数
+
 int trans(char *e) {
   int len, num, i, j;
   len = strlen(e);
