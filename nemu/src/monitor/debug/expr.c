@@ -1,81 +1,94 @@
 #include "nemu.h"
+#include "common.h"
+#include "monitor/expr.h"
+#include <stdlib.h>
 
 /* We use the POSIX regex functions to process regular expressions.
  * Type 'man regex' for more information about POSIX regex functions.
  */
 #include <sys/types.h>
 #include <regex.h>
-#include <stdlib.h>
 
 enum {
-  TK_NOTYPE = 256, 
-  TK_DECNUM = 255,
-  TK_HEXNUM = 254,
-  TK_REGNAME = 253,
-  TK_LP = '(',
-  TK_RP = ')',
-  TK_NEG = 248,
-  TK_DEREF = 247,
-  TK_LGCNOT = '!',
-  TK_NOT = '~', 
-  TK_MUL = '*',
-  TK_DIV = '/',
-  TK_MOD = '%',
-  TK_ADD = '+',
-  TK_SUB = '-',
-  TK_LEFTSHFT = 246,
-  TK_RIGHTSHFT = 245,
-  TK_LEQ = 244,
-  TK_GEQ = 243,
-  TK_LE = 242,
-  TK_GE = 241,
-  TK_EQ = 252,
-  TK_NEQ = 251,
-  TK_AND = 240,
-  TK_XOR = 239,
-  TK_OR = 238,
-  TK_LGCAND = 250,
-  TK_LGCOR = 249
-
+  
+  RULE_ASSIGN=0,
+  RULE_OR,
+  RULE_AND,
+  RULE_BIT_OR,
+  RULE_BIT_XOR,
+  RULE_BIT_AND,
+  RULE_EQ, RULE_NE, 
+  RULE_GT, RULE_LT, RULE_GE, RULE_LE,
+  RULE_SHIFT_L, RULE_SHIFT_R,
+  RULE_ADD, RULE_SUB,
+  RULE_MUL, RULE_DIV, RULE_REM,
+  RULE_NOT, RULE_NEG, RULE_DER, RULE_BIT_NOT,
+  RULE_BRA_L, RULE_BRA_R,
+  
+  RULE_NOTYPE=256, RULE_DIGIT, RULE_HEX, RULE_ALPHA, RULE_REG
+  
+  /* done */
   /* TODO: Add more token types */
+  
+};
 
+static struct precedence {
+  int rule;
+  int pre;
+} rule_pre[] = {
+  {RULE_ASSIGN,10},
+  {RULE_OR,20},
+  {RULE_AND,30},
+  {RULE_BIT_OR, 40},
+  {RULE_BIT_XOR, 50},
+  {RULE_BIT_AND, 60},
+  {RULE_EQ,70}, {RULE_NE,70},
+  {RULE_GT,80}, {RULE_LT, 80}, {RULE_GE,80}, {RULE_LE, 80},
+  {RULE_SHIFT_L, 90}, {RULE_SHIFT_R,90},
+  {RULE_ADD,100}, {RULE_SUB,100},
+  {RULE_MUL,110}, {RULE_DIV,110}, {RULE_REM, 110},
+  {RULE_NOT,120}, {RULE_NEG, 120}, {RULE_DER, 120}, {RULE_BIT_NOT, 120},
+  {RULE_BRA_L,130},{RULE_BRA_R,130}
 };
 
 static struct rule {
   char *regex;
   int token_type;
 } rules[] = {
-
+  
+  /* done */
   /* TODO: Add more rules.
    * Pay attention to the precedence level of different rules.
    */
-
-  {"0x[0-9a-fA-F]+", TK_HEXNUM},
-  {"[0-9]+", TK_DECNUM}, 
-  {"\\$[a-z]+", TK_REGNAME},
-  {" +", TK_NOTYPE},    // spaces
-  {"\\(", '('},         // left parenthese
-  {"\\)", ')'},         // right parenthese
-  {"\\*", '*'},         // multiply or derefrence
-  {"\\/", '/'},         // divide
-  {"\\%", '%'},         // mod
-  {"\\+", '+'},         // plus
-  {"\\-", '-'},         // substitude
-  {"<<", TK_LEFTSHFT},  // left shift
-  {">>", TK_RIGHTSHFT}, // right shift
-  {"<=", TK_LEQ},       // less or equal
-  {">=", TK_GEQ},       // greater or equal
-  {"<", TK_LE},         // less
-  {">", TK_GE},         // greater
-  {"==", TK_EQ},        // equal
-  {"\\!=", TK_NEQ},     // not equal
-  {"\\&\\&", TK_LGCAND},// logical and
-  {"\\|\\|", TK_LGCOR}, // logical or
-  {"\\!", '!'},         // logical not
-  {"\\&", TK_AND} ,     // and
-  {"\\^", TK_XOR},      // xor
-  {"\\|", TK_OR} ,      // or
-  {"\\~", '~'}          // not
+  
+  {"^((0x)|(0X))[0-9a-fA-F]+", RULE_HEX},
+  {"[0-9]+", RULE_DIGIT},
+  {"^[a-zA-Z_][a-zA-Z0-9_]*", RULE_ALPHA},
+  {"\\$(eax|ecx|edx|ebx|esp|ebp|esi|edi|eip)", RULE_REG},
+  {" +", RULE_NOTYPE},
+  {"\\+", RULE_ADD},
+  {"-", RULE_SUB},
+  {"\\*", RULE_MUL},
+  {"/", RULE_DIV},
+  {"%",RULE_REM},
+  {"\\(", RULE_BRA_L},
+  {"\\)", RULE_BRA_R},
+  {"!=", RULE_NE},
+  {"==", RULE_EQ},
+  {">=",RULE_GE},
+  {"<=",RULE_LE},
+  {"<<",RULE_SHIFT_L},
+  {">>",RULE_SHIFT_R},
+  {">", RULE_GT},
+  {"<",RULE_LT},
+  {"=", RULE_ASSIGN},
+  {"\\|\\|", RULE_OR},
+  {"&&", RULE_AND},
+  {"\\|", RULE_BIT_OR},
+  {"&",RULE_BIT_AND},
+  {"\\^",RULE_BIT_XOR},
+  {"~",RULE_BIT_NOT},
+  {"\\!", RULE_NOT},
 };
 
 #define NR_REGEX (sizeof(rules) / sizeof(rules[0]) )
@@ -89,408 +102,866 @@ void init_regex() {
   int i;
   char error_msg[128];
   int ret;
-
-  for (i = 0; i < NR_REGEX; i ++) {
+  
+  for(i = 0; i < NR_REGEX; i ++) {
     ret = regcomp(&re[i], rules[i].regex, REG_EXTENDED);
-    if (ret != 0) {
+    if(ret != 0) {
       regerror(ret, &re[i], error_msg, 128);
-      panic("regex compilation failed: %s\n%s", error_msg, rules[i].regex);
+      Assert(ret == 0, "regex compilation failed: %s\n%s", error_msg, rules[i].regex);
     }
   }
 }
-
-typedef struct token {
-  int type;
-  char str[32];
-} Token;
 
 Token tokens[32];
 int nr_token;
 
-static bool make_token(char *e) {
-  int position = 0;
-  int i;
-  regmatch_t pmatch;
+typedef struct variables {
+  char str[32];
+  int key;
+} variables;
 
-  nr_token = 0;
+#define VAR_MAX 32
+static variables var[VAR_MAX];
+static int var_cnt=0;
 
-  while (e[position] != '\0') {
-    /* Try all rules one by one. */
-    for (i = 0; i < NR_REGEX; i ++) {
-      if (regexec(&re[i], e + position, 1, &pmatch, 0) == 0 && pmatch.rm_so == 0) {
-        char *substr_start = e + position;
-        int substr_len = pmatch.rm_eo;
-        int IndexInTokenStr = 0;
-
-        Log("match rules[%d] = \"%s\" at position %d with len %d: %.*s",
-            i, rules[i].regex, position, substr_len, substr_len, substr_start);
-        position += substr_len;
-
-        /* TODO: Now a new token is recognized with rules[i]. Add codes
-         * to record the token in the array `tokens'. For certain types
-         * of tokens, some extra actions should be performed.
-         */
-        
-        // Don't have to handle spaces.
-        if (rules[i].token_type == TK_NOTYPE)
-          break;
-         
-        if (substr_len >= 32) {
-          printf("Exception: Token too long at position %d with length of %d.\n", position, substr_len);
-          return false;
-        }
-        
-        if (nr_token >= 32) {
-            printf("Exception: Expression is too long.\n");
-            return false;
-        }
-        
-        tokens[nr_token].type = rules[i].token_type;
-        
-        switch (rules[i].token_type) {
-          case TK_DECNUM:
-          case TK_HEXNUM:
-          case TK_REGNAME:
-            while (substr_len--) {
-              tokens[nr_token].str[IndexInTokenStr] = substr_start[IndexInTokenStr];
-              IndexInTokenStr++;
-            }
-            tokens[nr_token].str[IndexInTokenStr] = 0;
-            break;
-          case TK_LP:
-          case TK_RP:
-          case TK_MUL:
-          case TK_DIV:
-          case TK_ADD:
-          case TK_SUB:
-          case TK_LEFTSHFT:
-          case TK_RIGHTSHFT:
-          case TK_LEQ:
-          case TK_GEQ:
-          case TK_LE:
-          case TK_GE:
-          case TK_EQ:
-          case TK_NEQ:
-          case TK_AND:
-          case TK_XOR:
-          case TK_OR:
-          case TK_LGCAND:
-          case TK_LGCOR:
-          case TK_LGCNOT:
-          case TK_NOT:
-          case TK_MOD:
-            break;
-          default: 
-            printf("Unexpected: You are not expected to be here. Do please report this to the developer.\n");
-        }
-        nr_token++;
-        break;
-      }
-    }
-
-    if (i == NR_REGEX) {
-      printf("no match at position %d\n%s\n%*.s^\n", position, e, position, "");
-      return false;
+static int find_var(char *str) {
+  int i=0;
+  for (;i < var_cnt; ++i) {
+    if (strcmp(var[i].str, str)==0) {
+      return i;
     }
   }
-
-  return true;
+  return -1;
 }
 
-uint32_t finddom(int p, int q) {
-  int last = -1;
-  int lastlvl = 0;
-  int parentheselvl = 0;
-  
-  while (q >= p) {
-    if (parentheselvl != 0) {
-      if (tokens[q].type == TK_LP)
-        parentheselvl--;
-      if (tokens[q].type == TK_RP)
-        parentheselvl++;
-      q--;
-      continue;
-    }
-    switch (tokens[q].type) {
-      case TK_RP:
-        parentheselvl++;
-        break;
-      case TK_NEG:
-      case TK_DEREF:
-      case TK_NOT:
-      case TK_LGCNOT:
-        if (lastlvl <= 3) { // Right combined
-          last = q;
-          lastlvl = 3;
-        }
-        break;
-      case TK_MUL:
-      case TK_DIV:
-      case TK_MOD:
-        if (lastlvl < 5) {
-          last = q;
-          lastlvl = 5;
-        }
-        break;
-      case TK_ADD:
-      case TK_SUB:
-        if (lastlvl < 6) {
-          last = q;
-          lastlvl = 6;
-        }
-        break;
-      case TK_LEFTSHFT:
-      case TK_RIGHTSHFT:
-        if (lastlvl < 7) {
-          last = q;
-          lastlvl = 7;
-        }
-        break;
-      case TK_LEQ:
-      case TK_GEQ:
-      case TK_LE:
-      case TK_GE:
-        if (lastlvl < 8) {
-          last = q;
-          lastlvl = 8;
-        }
-        break;
-      case TK_EQ:
-      case TK_NEQ:
-        if (lastlvl < 9) {
-          last = q;
-          lastlvl = 9;
-        }
-        break;
-      case TK_AND:
-        if (lastlvl < 10) {
-          last = q;
-          lastlvl = 10;
-        }
-        break;
-      case TK_XOR:
-        if (lastlvl < 11) {
-          last = q;
-          lastlvl = 11;
-        }
-        break;
-      case TK_OR:
-        if (lastlvl < 12) {
-          last = q;
-          lastlvl = 12;
-        }
-        break;
-      case TK_LGCAND:
-        if (lastlvl < 13) {
-          last = q;
-          lastlvl = 13;
-        }
-        break;
-      case TK_LGCOR:
-        if (lastlvl < 14) {
-          last = q;
-          lastlvl = 14;
-        }
-        break;
-      default:
-        break;
-    }
-    q--;
+static int set_var(char *str, int value) {
+  int i=0;
+  if (var_cnt==VAR_MAX) {
+    printf("Variables reached limits (%d), please clear!\n", VAR_MAX);
+    return -1;
   }
-  if (parentheselvl != 0) {
-    printf("Exception: Unmatched parenthese \'%s\'.\n", ((parentheselvl < 0) ? "(" : ")"));
-    last = -1;
+  for (;i < var_cnt; ++i) {
+    if (strcmp(var[i].str, str)==0) {
+      var[i].key=value;
+      return i;
+    }
   }
-  return last;
+  strcpy(var[var_cnt].str,str);
+  var[var_cnt].key=value;
+  ++var_cnt;
+  return var_cnt-1;
 }
 
-bool check_parentheses(int p, int q, bool *success) {
-  int parentheselvl = 0;
-  bool retval = true;
-  
-  if (tokens[p].type != TK_LP || tokens[q].type != TK_RP)
-    return false;
-  
-  p += 1;
-  while (p < q) {
-    if (tokens[p].type == TK_LP)
-      parentheselvl += 1;
-    else if (tokens[p].type == TK_RP) {
-      if (parentheselvl == 0 && retval == true)
-        retval = false;
-      parentheselvl -= 1;
-    }
-    p += 1;
-  }
-  if (parentheselvl == 0)
-    return retval;
-  *success = false;
-  printf("Exception: Unmatched parenthese \'%s\'.\n", ((parentheselvl > 0) ? "(" : ")"));
+static int clear_var() {
+  var_cnt=0;
+  printf("Ok!\n");
+  return 0;
+}
+
+static char *cpu_name_rule[]={"$eax", "$ecx", "$edx", "$ebx", "$esp", "$ebp", "$esi", "$edi", "$eip"};
+
+static bool print_err(char *str, int n) {
+  fprintf(stderr, "%s\n\033[32m%*c\033[0m\n", str, n+1, '^');
   return false;
 }
 
-uint32_t hexstr2int(char* hexnum) {
-  uint32_t result = 0;
-  int p = 2;
-  while (hexnum[p]) {
-    if (hexnum[p] >= '0' && hexnum[p] <= '9')
-      result = result * 16 + (hexnum[p] - '0');
-    else if (hexnum[p] >= 'A' && hexnum[p] <= 'F')
-      result = result * 16 + (hexnum[p] - 'A' + 10);  
-    else if (hexnum[p] >= 'a' && hexnum[p] <= 'f')
-      result = result * 16 + (hexnum[p] - 'a' + 10); 
-    p += 1; 
-  }
-  return result;
-}
 
-
-uint32_t eval(int p, int q, bool *success) {
-  int domop;
-  uint32_t val1;
-  uint32_t val2;
+bool make_token(char *e, bool *is_match, int prompt) {
+  *is_match=true;
+  int position = 0;
   int i;
+  regmatch_t pmatch;
+  int left=0,right=0;
+  nr_token = 0;
+  int start_alpha=0;
+  while(e[position] != '\0') {
+    /* Try all rules one by one. */
+    for(i = 0; i < NR_REGEX; i ++) {
+      if(regexec(&re[i], e + position, 1, &pmatch, 0) == 0 && pmatch.rm_so == 0) {
+  char *substr_start = e + position;
+  int substr_len = pmatch.rm_eo;
   
-  if (p > q) {
-    printf("Exception: Bad expression. p = %d, q = %d\n", p, q);
-    *success = false;
-    return 0;
+//  Log("match rules[%d] = \"%s\" at position %d with len %d: %.*s", i, rules[i].regex, position, substr_len, substr_len, substr_start);
+  
+  
+  /* done */
+  /* TODO: Now a new token is recognized with rules[i]. Add codes
+   * to record the token in the array `tokens'. For certain types
+   * of tokens, some extra actions should be performed.
+   */
+  int is_neg_or_der=0;
+  int t;
+  if (start_alpha&&nr_token==1&&rules[i].token_type!=RULE_ASSIGN&&rules[i].token_type!=RULE_NOTYPE) {
+    return print_err(e, position);
   }
-  else if (p == q) {
-    if (tokens[p].type == TK_DECNUM)
-      return atoi(tokens[p].str);
-    if (tokens[p].type == TK_HEXNUM)
-      return hexstr2int(tokens[p].str);
-    if (tokens[p].type == TK_REGNAME) {
-      if (!strcmp(tokens[p].str, "$eip"))
-        return cpu.eip;
-      if (!strcmp(tokens[p].str, "$eflags"))
-        return cpu.eflags;
-      if (!strcmp(tokens[p].str, "$zf"))
-        return cpu.flags.ZF;
-      if (!strcmp(tokens[p].str, "$of"))
-        return cpu.flags.OF;
-      if (!strcmp(tokens[p].str, "$cf"))
-        return cpu.flags.CF;
-      if (!strcmp(tokens[p].str, "$sf"))
-        return cpu.flags.SF;
-      if (!strcmp(tokens[p].str, "$if"))
-        return cpu.flags.IF;
-      /*
-         str + 1 is used to ignore the $ in regname
-      */
-      for (i = 0; i < 8; i++) {
-        if (!strcmp(tokens[p].str + 1, reg_name(i, 4))) {
-          return reg_l(i);
+  if (substr_len>31) {
+    fprintf(stderr, "The string is too long!\n");
+    return print_err(e, position);
+  }
+  if (nr_token>31) {
+    fprintf(stderr, "Too many terms!\n");
+    return false;
+  }
+  switch(rules[i].token_type) {
+    case RULE_DIGIT:
+      if (nr_token!=0) {
+        t=tokens[nr_token-1].type;
+        if (t==RULE_NEG) {
+    --nr_token;
+    is_neg_or_der=1;
         }
-        if (!strcmp(tokens[p].str + 1, reg_name(i, 2))) {
-          return reg_w(i);
+        else if (t==RULE_DER){
+    --nr_token;
+    is_neg_or_der=2;
         }
-        if (!strcmp(tokens[p].str + 1, reg_name(i, 1))) {
-          return reg_b(i);
+        else if (t==RULE_DIGIT || t==RULE_HEX || t==RULE_ALPHA || t==RULE_BRA_R || t==RULE_REG) {
+    return print_err(e, position);
         }
       }
-    }
-    *success = false;
-    printf("Exception: Orphan operator.\n");
-    return 0;
-  }
-  else if (check_parentheses(p, q, success) == true) {
-    return eval(p + 1, q - 1, success);
-  }
-  else if (*success) {
-    domop = finddom(p, q);
-    
-    if (domop == -1) {
-      *success = false;
-      return 0;
-    }
-    
-    
-    if (tokens[domop].type == TK_DEREF || tokens[domop].type == TK_NEG || tokens[domop].type == TK_LGCNOT || tokens[domop].type == TK_NOT) {
-      /* 
-         We define a * or a - as deref or neg if and only if the token before
-         it is an operator, so as long as there are still tokens before deref/neg
-         in the subexpr, deref/neg will not be the domop.
-      */ 
-      val1 = eval(p + 1, q, success);
-      if (*success == false)
-        return 0;
+      tokens[nr_token].type=RULE_DIGIT;
+      strncpy(tokens[nr_token].str,substr_start,substr_len);
+      tokens[nr_token].str[substr_len]='\0';
+      tokens[nr_token].value=strtol(tokens[nr_token].str,NULL,0);
+      if (is_neg_or_der==1) {
+        tokens[nr_token].value=-tokens[nr_token].value;
+      }
+      else if(is_neg_or_der==2){
+        tokens[nr_token].value=(int)swaddr_read((swaddr_t)tokens[nr_token].value,4);
+      }
+      break;
+    case RULE_HEX:
+      if (nr_token!=0) {
+        t=tokens[nr_token-1].type;
+        if (t==RULE_NEG) {
+    --nr_token;
+    is_neg_or_der=1;
+        }
+        else if (t==RULE_DER){
+    --nr_token;
+    is_neg_or_der=2;
+        }
+        else if (t==RULE_DIGIT || t==RULE_HEX || t==RULE_ALPHA || t==RULE_BRA_R || t==RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      tokens[nr_token].type=RULE_HEX;
+      strncpy(tokens[nr_token].str,substr_start,substr_len);
+      tokens[nr_token].str[substr_len]='\0';
+      tokens[nr_token].value=strtol(tokens[nr_token].str,NULL,0);
+      if (is_neg_or_der==1) {
+        tokens[nr_token].value=-tokens[nr_token].value;
+      }
+      else if(is_neg_or_der==2){
+        tokens[nr_token].value=(int)swaddr_read((swaddr_t)tokens[nr_token].value,4);
+      }
+      break;
+    case RULE_ALPHA: 
+      if (nr_token!=0) {
+        t=tokens[nr_token-1].type;
+        if (t==RULE_NEG) {
+    --nr_token;
+    is_neg_or_der=1;
+        }
+        else if (t==RULE_DER) {
+    --nr_token;
+    is_neg_or_der=2;
+        }
+        else if (t==RULE_DIGIT || t==RULE_HEX || t==RULE_ALPHA || t==RULE_BRA_R || t==RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      tokens[nr_token].type=RULE_ALPHA;
+      strncpy(tokens[nr_token].str,substr_start,substr_len);
+      tokens[nr_token].str[substr_len]='\0';
+      //printf("%s\n", tokens[nr_token].str);
+      int tmp_var=find_var(tokens[nr_token].str);
+      //printf("var: %d\n",tmp_var);
+      //int is_find=find_var(tokens[nr_token].str);
+      if (nr_token==0) {
+        //tmp_var=set_var(tokens[nr_token].str,0);
+        if (tmp_var==-1) {
+    start_alpha=1;
+        }
+        else {
+    tokens[nr_token].value=var[tmp_var].key;
+        }
+        /*if (tmp_var==-1) {
+         *    return false;
+      }*/
+      }
+      else if (tmp_var!=-1) {
+        if (is_neg_or_der==0) {
+    tokens[nr_token].value=var[tmp_var].key;
+        }
+        if (is_neg_or_der==1) {
+    tokens[nr_token].value=-var[tmp_var].key;
+        }
+        else if(is_neg_or_der==2) {
+    tokens[nr_token].value=(int)swaddr_read((swaddr_t)var[tmp_var].key,4);
+        }
+      }
+      else {
+        fprintf(stderr, "Cannot find the variable '%s'\n", tokens[nr_token].str);
+        return false;
+      }
+      break;
+    case RULE_REG:
       
-      if (tokens[domop].type == TK_DEREF)
-        return vaddr_read(val1, 4);
-      if (tokens[domop].type == TK_NEG)  
-        return -val1;
-      if (tokens[domop].type == TK_LGCNOT)  
-        return !val1;
-      if (tokens[domop].type == TK_NOT)  
-        return ~val1;
-    }
-    
-    val1 = eval(p, domop - 1, success);
-    val2 = eval(domop + 1, q, success);
-    if (*success == false)
-      return 0;
-    
-    switch (tokens[domop].type) {
-      case TK_ADD: return val1 + val2;
-      case TK_SUB: return val1 - val2;
-      case TK_MUL: return val1 * val2;
-      case TK_DIV:
-        if (val2 == 0) {
-          *success = false;
-          printf("Exception: Cannot be divided by 0.\n");
-          return 0;
+      if (nr_token!=0) {
+        t=tokens[nr_token-1].type;
+        if (t==RULE_NEG) {
+    --nr_token;
+    is_neg_or_der=1;
+        }
+        else if (t==RULE_DER) {
+    --nr_token;
+    is_neg_or_der=2;
+        }
+        else if (t==RULE_DIGIT || t==RULE_HEX || t==RULE_ALPHA || t==RULE_BRA_R || t==RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      tokens[nr_token].type=RULE_REG;
+      strncpy(tokens[nr_token].str,substr_start,substr_len);
+      tokens[nr_token].str[substr_len]='\0';
+      int gpr_cnt=0;
+      for (;gpr_cnt<8;++gpr_cnt) {
+        if (strcmp(tokens[nr_token].str,cpu_name_rule[gpr_cnt])==0) {
+    tokens[nr_token].value=(int)cpu.gpr[gpr_cnt]._32;
+    break;
+        }
+      }
+      if (gpr_cnt==8) {
+        tokens[nr_token].value=(int)cpu.eip;
+      }
+      if (is_neg_or_der==1) {
+        tokens[nr_token].value=-tokens[nr_token].value;
+      }
+      else if(is_neg_or_der==2) {
+        tokens[nr_token].value=(int)swaddr_read((swaddr_t)tokens[nr_token].value,4);
+      }
+      break;
+    case RULE_NOTYPE:--nr_token;break;
+    case RULE_ADD:
+      tokens[nr_token].type=RULE_ADD;
+      strcpy(tokens[nr_token].str, "+");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      else
+      {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_SUB:
+      tokens[nr_token].type=RULE_SUB;
+      strcpy(tokens[nr_token].str, "-");
+      if (nr_token!=0) {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_REG && t!=RULE_BRA_R)
+        {
+    tokens[nr_token].type=RULE_NEG;
+        }
+      }
+      else {
+        tokens[nr_token].type=RULE_NEG;
+      }
+      if (tokens[nr_token].type!=RULE_NEG) {
+        if (nr_token==0) {
+    return print_err(e, position);
         }
         else
-          return val1 / val2;
-      case TK_MOD:
-        if (val2 == 0) {
-          *success = false;
-          printf("Exception: Cannot be divided by 0.\n");
-          return 0;
+        {
+    t=tokens[nr_token-1].type;
+    if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+      return print_err(e, position);
+    }
+        }
+      }
+      break;
+    case RULE_MUL:
+      tokens[nr_token].type=RULE_MUL;
+      strcpy(tokens[nr_token].str, "*");
+      if (nr_token!=0) {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_REG && t!=RULE_BRA_R)
+        {
+    tokens[nr_token].type=RULE_DER;
+        }
+      }
+      else {
+        tokens[nr_token].type=RULE_DER;
+      }
+      if (tokens[nr_token].type!=RULE_DER) {
+        if (nr_token==0) {
+    return print_err(e, position);
         }
         else
-          return val1 % val2;
-      case TK_LEFTSHFT: return val1 << val2;
-      case TK_RIGHTSHFT: return val1 >> val2;
-      case TK_LEQ: return val1 <= val2;
-      case TK_GEQ: return val1 >= val2;
-      case TK_LE: return val1 < val2; 
-      case TK_GE: return val1 > val2;
-      case TK_EQ: return val1 == val2;
-      case TK_NEQ: return val1 != val2;
-      case TK_AND: return val1 & val2;
-      case TK_XOR: return val1 ^ val2;
-      case TK_OR: return val1 | val2;
-      case TK_LGCAND: return val1 && val2;
-      case TK_LGCOR: return val1 || val2;
-      
-      default: 
-        *success = false;
-        printf("Unexpected: You are not expected to be here. Do please report this to the developer.\n");
-        return 0;
+        {
+    t=tokens[nr_token-1].type;
+    if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+      return print_err(e, position);
+    }
+        }
+      }
+      break;
+    case RULE_DIV:
+      tokens[nr_token].type=RULE_DIV;
+      strcpy(tokens[nr_token].str, "/");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      else
+      {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_REM:
+      tokens[nr_token].type=RULE_REM;
+      strcpy(tokens[nr_token].str, "%");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      else
+      {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_SHIFT_L:
+      tokens[nr_token].type=RULE_SHIFT_L;
+      strcpy(tokens[nr_token].str, "<<");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      else
+      {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_SHIFT_R:
+      tokens[nr_token].type=RULE_SHIFT_R;
+      strcpy(tokens[nr_token].str, ">>");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      else
+      {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_BRA_L:
+      tokens[nr_token].type=RULE_BRA_L;
+      strcpy(tokens[nr_token].str, "(");
+      if (nr_token!=0)
+      {
+        t=tokens[nr_token-1].type;
+        if (t==RULE_DIGIT || t==RULE_HEX || t==RULE_ALPHA || t==RULE_REG || t==RULE_BRA_R)
+        {
+    return print_err(e, position);
+        }
+      }
+      ++left;
+      break;
+    case RULE_BRA_R:
+      tokens[nr_token].type=RULE_BRA_R;
+      strcpy(tokens[nr_token].str, ")");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      t=tokens[nr_token-1].type;
+      if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_REG && t!=RULE_BRA_R)
+      {
+        return print_err(e, position);
+      }
+      ++right;
+      if (right>left) {
+        return print_err(e, position);
+      }
+      break;
+    case RULE_NE:
+      tokens[nr_token].type=RULE_NE;
+      strcpy(tokens[nr_token].str,"!=");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      else
+      {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_EQ:
+      tokens[nr_token].type=RULE_EQ;
+      strcpy(tokens[nr_token].str,"==");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      else
+      {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_GT:
+      tokens[nr_token].type=RULE_GT;
+      strcpy(tokens[nr_token].str,">");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      else
+      {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_LT:
+      tokens[nr_token].type=RULE_LT;
+      strcpy(tokens[nr_token].str,"<");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      else
+      {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_GE:
+      tokens[nr_token].type=RULE_GE;
+      strcpy(tokens[nr_token].str,">=");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      else
+      {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_LE:
+      tokens[nr_token].type=RULE_LE;
+      strcpy(tokens[nr_token].str,"<=");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      else
+      {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_ASSIGN:
+      if (nr_token!=1 || tokens[0].type!=RULE_ALPHA) {
+        return print_err(e, position);
+      }
+      tokens[nr_token].type=RULE_ASSIGN;
+      strcpy(tokens[nr_token].str,"="); 
+      if (nr_token!=1||tokens[0].type!=RULE_ALPHA) {
+        return print_err(e, position);
+      }
+      break;
+    case RULE_OR:
+      tokens[nr_token].type=RULE_OR;
+      strcpy(tokens[nr_token].str,"||");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      else
+      {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_BIT_OR:
+      tokens[nr_token].type=RULE_BIT_OR;
+      strcpy(tokens[nr_token].str,"|");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      else
+      {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_BIT_AND:
+      tokens[nr_token].type=RULE_BIT_AND;
+      strcpy(tokens[nr_token].str,"&");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      else
+      {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_BIT_XOR:
+      tokens[nr_token].type=RULE_BIT_XOR;
+      strcpy(tokens[nr_token].str,"^");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      else
+      {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_AND:
+      tokens[nr_token].type=RULE_AND;
+      strcpy(tokens[nr_token].str,"&&");
+      if (nr_token==0) {
+        return print_err(e, position);
+      }
+      else
+      {
+        t=tokens[nr_token-1].type;
+        if (t!=RULE_DIGIT && t!=RULE_HEX && t!=RULE_ALPHA && t!=RULE_BRA_R && t!=RULE_REG) {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_NOT:
+      tokens[nr_token].type=RULE_NOT;
+      strcpy(tokens[nr_token].str, "!");
+      if (nr_token!=0) {
+        t=tokens[nr_token-1].type;
+        if (t==RULE_DIGIT || t==RULE_HEX || t==RULE_ALPHA || t==RULE_REG || t==RULE_BRA_R)
+        {
+    return print_err(e, position);
+        }
+      }
+      break;
+    case RULE_BIT_NOT:
+      tokens[nr_token].type=RULE_BIT_NOT;
+      strcpy(tokens[nr_token].str, "~");
+      if (nr_token!=0) {
+        t=tokens[nr_token-1].type;
+        if (t==RULE_DIGIT || t==RULE_HEX || t==RULE_ALPHA || t==RULE_REG || t==RULE_BRA_R)
+        {
+    return print_err(e, position);
+        }
+      }
+      break;
+  }
+  position += substr_len;
+  ++nr_token;
+  break;
+      }
+    }
+    if(i == NR_REGEX) {
+        if (prompt)
+        {
+          printf("no match at position %d\n%s\n%*.s^\n", position, e, position, "");
+        }
+      *is_match=false;
+      return false;
+    }
+  }
+  int t2;
+  if (nr_token>0)
+  {
+    t2=tokens[nr_token-1].type;
+    if (t2!=RULE_DIGIT && t2!=RULE_HEX && t2!=RULE_ALPHA && t2!=RULE_BRA_R && t2!=RULE_REG) {
+      return print_err(e, position-1);
+    }
+  }
+  if (left!=right) {
+    fprintf(stderr, "Brackets do not match.\n");
+    return false;
+  }
+  if (start_alpha==1 && nr_token==1) {
+    *is_match=false;
+    if (prompt) {
+      fprintf(stderr, "Cannot find the variable '%s'\n", tokens[0].str);
+      *is_match=true;
+    }
+    return false;
+  }
+  return true; 
+}
+
+static int find_digit(int p, int q, int op, int *pre, int *next) {
+  int i;
+  if (tokens[op].type<RULE_NOT) {
+    for (i=op;i>=p;--i) {
+      if (tokens[i].type>RULE_NOTYPE) {
+  *pre=i;
+  break;
+      }
+    }
+    if (i<p) {
+      return -1;
+    }
+  }
+  for (i=op;i<=q;++i) {
+    if (tokens[i].type>RULE_NOTYPE) {
+      *next=i;
+      break;
+    }
+  }
+  if (i>q) {
+    return -1;
+  }
+  return 0;
+}
+
+static int eval(int p, int q, bool *success) {
+  if (p==q) {
+    *success=true;
+    return tokens[p].value;
+  }
+  int i=p;
+  int op=0;
+  for (i=p;i<=q;++i) {
+    if (tokens[i].type<RULE_NOTYPE) {
+      ++op;
+    }
+  }
+  int j=0;
+  for (;j<op;++j) {
+    int max_pre=-1, max_pre_pos=-1;
+    for (i=p;i<=q;++i) {
+      if (tokens[i].type<RULE_NOTYPE&&rule_pre[tokens[i].type].pre>max_pre) {
+  max_pre=rule_pre[tokens[i].type].pre;
+  max_pre_pos=i;
+      }
+    }
+    if (max_pre!=-1) {
+      int pre=0,next=0;
+      if (find_digit(p,q,max_pre_pos,&pre,&next)==0) {
+  switch (tokens[max_pre_pos].type) {
+    case RULE_AND:
+      tokens[max_pre_pos].value=(tokens[pre].value&&tokens[next].value);
+      break;
+    case RULE_BIT_AND:
+      tokens[max_pre_pos].value=(tokens[pre].value&tokens[next].value);
+      break;
+    case RULE_OR:
+      tokens[max_pre_pos].value=(tokens[pre].value||tokens[next].value);
+      break;
+    case RULE_BIT_OR:
+      tokens[max_pre_pos].value=(tokens[pre].value|tokens[next].value);
+      break;
+    case RULE_BIT_XOR:
+      tokens[max_pre_pos].value=(tokens[pre].value^tokens[next].value);
+      break;
+    case RULE_EQ:
+      tokens[max_pre_pos].value=(tokens[pre].value==tokens[next].value);
+      break;
+    case RULE_NE:
+      tokens[max_pre_pos].value=(tokens[pre].value!=tokens[next].value);
+      break;
+    case RULE_GT:
+      tokens[max_pre_pos].value=(tokens[pre].value>tokens[next].value);
+      break;
+    case RULE_LT:
+      tokens[max_pre_pos].value=(tokens[pre].value<tokens[next].value);
+      break;
+    case RULE_GE:
+      tokens[max_pre_pos].value=(tokens[pre].value>=tokens[next].value);
+      break;
+    case RULE_LE:
+      tokens[max_pre_pos].value=(tokens[pre].value<=tokens[next].value);
+      break;
+    case RULE_ADD:
+      tokens[max_pre_pos].value=(tokens[pre].value+tokens[next].value);
+      break;
+    case RULE_SUB:
+      tokens[max_pre_pos].value=(tokens[pre].value-tokens[next].value);
+      break;
+    case RULE_MUL:
+      tokens[max_pre_pos].value=(tokens[pre].value*tokens[next].value);
+      break;
+    case RULE_DIV:
+      if (tokens[next].value) {
+        tokens[max_pre_pos].value=(tokens[pre].value/tokens[next].value);
+      }
+      else {
+        fputs("Divisor cannot be zero!\n", stderr);
+        *success=false;
+        return -1;
+      }
+      break;
+    case RULE_REM:
+      if (tokens[next].value) {
+        tokens[max_pre_pos].value=(tokens[pre].value%tokens[next].value);
+      }
+      else {
+        fputs("Divisor cannot be zero!\n", stderr);
+        *success=false;
+        return -1;
+      }
+      break;
+    case RULE_SHIFT_L:
+      tokens[max_pre_pos].value=(tokens[pre].value<<tokens[next].value);
+      break;
+    case RULE_SHIFT_R:
+      tokens[max_pre_pos].value=(tokens[pre].value>>tokens[next].value);
+      break;
+    case RULE_NOT:
+      tokens[max_pre_pos].value=(!tokens[next].value);
+      break;
+    case RULE_NEG:
+      tokens[max_pre_pos].value=(-tokens[next].value);
+      break;
+    case RULE_DER:
+      tokens[max_pre_pos].value=(int)swaddr_read((swaddr_t)tokens[next].value,4);
+      break;
+    case RULE_BIT_NOT:
+      tokens[max_pre_pos].value=(~tokens[next].value);
+      break;
+  }
+  tokens[next].type=RULE_NOTYPE;
+  if (tokens[max_pre_pos].type<RULE_NOT) {
+    tokens[pre].type=RULE_NOTYPE;
+  }
+  tokens[max_pre_pos].type=RULE_DIGIT;
+      }
+      else {
+  printf("calculate error! please debug!\n");
+  *success=false;
+  return 0;
+      }
+    }
+  }
+  for (i=p;i<=q;++i) {
+    if (tokens[i].type>RULE_NOTYPE) {
+      *success=true;
+      return tokens[i].value;
+    }
+  }
+  *success=false;
+  return -1;
+}
+
+static int check_brackets(int p, int q, int *r, int *s) {
+  int i;
+  for (i=p; i<=q; ++i) {
+    if (tokens[i].type==RULE_BRA_L) {
+      int j=i+1;
+      int cnt=1, cnt2=1;
+      for (;j<=q;++j ) {
+  if (tokens[j].type==RULE_BRA_L) {
+    ++cnt;
+    ++cnt2;
+  }
+  else if (tokens[j].type==RULE_BRA_R) {
+    --cnt;
+    if (cnt==0) {
+      *r=i;
+      *s=j;
+      return cnt2;
+    }
+  }
+      }
+      return -1;
     }
   }
   return 0;
 }
 
-uint32_t expr(char *e, bool *success) {
-  *success = true;
-  int i;
-  
-  if (!make_token(e)) {
-    *success = false;
+static int eval_bra(int p, int q, bool *success) {
+  int pp=p,qq=q;
+  int check;
+  while ((check=check_brackets(p,q,&pp,&qq))!=0) {
+    if (check==-1) {
+      *success=false;
+      return -1;
+    }
+    tokens[pp].type=RULE_NOTYPE;
+    tokens[qq].type=RULE_NOTYPE;
+    eval_bra(pp+1,qq-1,success);
+    if (*success!=true) {
+      return -1;
+    }
+  }
+  return eval(p,q,success);
+}
+
+int eval_start(bool *success) {
+  if (nr_token>=2 && tokens[1].type==RULE_ASSIGN) {
+    int key=eval_bra(2, nr_token-1, success);
+    int i=set_var(tokens[0].str, key);
+    if (success==false) {
+      return -1;
+    }
+    if (i==-1) {
+      printf("The result is ");
+      return key;
+    }
+    printf("%s = ", var[i].str);
+    return key;
+  }
+  else {
+    return eval_bra(0, nr_token-1, success);
+  }
+}
+
+uint32_t expr(char *e, bool *success, int prompt) {
+  if (e==NULL) {
+    return 1;
+  }
+  if (strcmp("clear",e)==0) {
+    clear_var();
+    *success=true;
     return 0;
   }
-  
-  /* TODO: Insert codes to evaluate the expression. */
-  for(i = 0; i < nr_token; i++) {
-    if (tokens[i].type == TK_MUL && (i == 0 || (tokens[i - 1].type != TK_RP && tokens[i - 1].type != TK_DECNUM && tokens[i - 1].type != TK_HEXNUM && tokens[i - 1].type != TK_REGNAME)))
-      tokens[i].type = TK_DEREF;
-    if (tokens[i].type == TK_SUB && (i == 0 || (tokens[i - 1].type != TK_RP && tokens[i - 1].type != TK_DECNUM && tokens[i - 1].type != TK_HEXNUM && tokens[i - 1].type != TK_REGNAME)))
-      tokens[i].type = TK_NEG;
+  bool is_match=true;
+  if(!make_token(e, &is_match, prompt)) {
+    //printf("is_match: %d\n",is_match);
+    if (is_match==false) {
+      *success = false;
+    }
+    else {
+      *success=true;
+    }
+    return 0;
+  }
+  bool s=true;
+  int result=eval_start(&s);
+  if (s==true) {
+    printf("%d\n", result);
   }
   
-  return eval(0, nr_token - 1, success);
+  /* done */
+  /* TODO: Insert codes to evaluate the expression. */
+  //panic("please implement me");
+  return 0;
 }

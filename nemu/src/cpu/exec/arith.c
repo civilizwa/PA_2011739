@@ -1,76 +1,106 @@
 #include "cpu/exec.h"
 
 make_EHelper(add) {
-  rtl_sext(&t1, &id_dest->val, id_dest->width);
-  rtl_sext(&t2, &id_src->val, id_src->width);
+  //TODO();
+  rtl_add(&t2, &id_dest->val, &id_src->val);
+  operand_write(id_dest, &t2);
 
-  rtl_add(&t0, &id_dest->val, &id_src->val);
-  t1 = (t0 < id_dest->val);
-  rtl_set_CF(&t1);
-  t1 = ((((int32_t)(id_dest->val) < 0) == ((int32_t)(id_src->val) < 0)) && (((int32_t)(t0) < 0) != ((int32_t)(id_dest->val) < 0)));
-  rtl_set_OF(&t1);
-  rtl_update_ZFSF(&t0, 4);
-  operand_write(id_dest, &t0);
+  rtl_update_ZFSF(&t2, id_dest->width);
+
+  rtl_sltu(&t0, &t2, &id_dest->val);
+  rtl_set_CF(&t0);
+
+  rtl_xor(&t0, &id_dest->val, &id_src->val);
+  rtl_not(&t0);
+  rtl_xor(&t1, &id_dest->val, &t2);
+  rtl_and(&t0, &t0, &t1);
+  rtl_msb(&t0, &t0, id_dest->width);
+  rtl_set_OF(&t0);
+
   print_asm_template2(add);
 }
 
 make_EHelper(sub) {
-  rtl_sext(&t1, &id_dest->val, id_dest->width);
-  rtl_sext(&t2, &id_src->val, id_src->width);
-  
-  rtl_sub(&t0, &t1, &t2);
-  t3 = (t0 > t1);
-  rtl_set_CF(&t3);
-  t3 = ((((int32_t)(t1) < 0) == ((t2 >> 31) == 0)) && (((int32_t)(t0) < 0) != ((int32_t)(t1) < 0)));
-  rtl_set_OF(&t3);
-  rtl_update_ZFSF(&t0, 4);
-  operand_write(id_dest, &t0);
+  //TODO();
+  rtl_sub(&t2, &id_dest->val, &id_src->val);
+  operand_write(id_dest, &t2);
+
+  rtl_update_ZFSF(&t2, id_dest->width);
+
+  rtl_sltu(&t0, &id_dest->val, &t2);
+  rtl_set_CF(&t0);
+
+  rtl_xor(&t0, &id_dest->val, &id_src->val);
+  rtl_xor(&t1, &id_dest->val, &t2);
+  rtl_and(&t0, &t0, &t1);
+  rtl_msb(&t0, &t0, id_dest->width);
+  rtl_set_OF(&t0);
+
   print_asm_template2(sub);
 }
 
 make_EHelper(cmp) {
-  rtl_sext(&t1, &id_dest->val, id_dest->width);
-  rtl_sext(&t2, &id_src->val, id_src->width);
-  
-  rtl_sub(&t0, &t1, &t2);
-  t3 = (t0 > t1);
-  rtl_set_CF(&t3);
-  t3 = ((((int32_t)(t1) < 0) == ((t2 >> 31) == 0)) && (((int32_t)(t0) < 0) != ((int32_t)(t1) < 0)));
-  rtl_set_OF(&t3);
-  rtl_update_ZFSF(&t0, 4);
+  //TODO();
+  rtl_sub(&t2, &id_dest->val, &id_src->val);
+
+  rtl_update_ZFSF(&t2, id_dest->width);
+
+  rtl_sltu(&t0, &id_dest->val, &t2);
+  rtl_set_CF(&t0);
+
+  rtl_xor(&t0, &id_dest->val, &id_src->val);
+  rtl_xor(&t1, &id_dest->val, &t2);
+  rtl_and(&t0, &t0, &t1);
+  rtl_msb(&t0, &t0, id_dest->width);
+  rtl_set_OF(&t0);
+
   print_asm_template2(cmp);
 }
 
 make_EHelper(inc) {
-  t0 = id_dest->val + 1;
-  t1 = (t0 < id_dest->val);
-  rtl_set_CF(&t1);
-  t1 = (((id_dest->val < 0) == (1 < 0)) && ((t0 < 0) != (id_dest->val < 0)));
-  rtl_set_OF(&t1);
-  rtl_update_ZFSF(&t0, 4);
-  operand_write(id_dest, &t0);
+  //TODO();
+  t1 = 1;
+  rtl_add(&t2, &id_dest->val, &t1);
+  operand_write(id_dest, &t2);
+
+  rtl_update_ZFSF(&t2, id_dest->width);
+
+  rtl_sltu(&t0, &t2, &id_dest->val);
+
+  rtl_xor(&t0, &id_dest->val, &id_src->val);
+  rtl_not(&t0);
+  rtl_xor(&t1, &id_dest->val, &t2);
+  rtl_and(&t0, &t0, &t1);
+  rtl_msb(&t0, &t0, id_dest->width);
+  rtl_set_OF(&t0);
+
   print_asm_template1(inc);
 }
 
 make_EHelper(dec) {
-  t0 = id_dest->val - 1;
-  t1 = (t0 > id_dest->val);
-  rtl_set_CF(&t1);
-  t1 = (((id_dest->val < 0) == (-1 < 0)) && ((t0 < 0) != (id_dest->val < 0)));
-  rtl_set_OF(&t1);
-  rtl_update_ZFSF(&t0, 4);
-  operand_write(id_dest, &t0);
+  //TODO();
+  t1 = 1;
+  rtl_sub(&t2, &id_dest->val, &t1);
+  operand_write(id_dest, &t2);
+
+  rtl_update_ZFSF(&t2, id_dest->width);
+
+  rtl_sltu(&t0, &id_dest->val, &t2);
+
+  rtl_xor(&t0, &id_dest->val, &id_src->val);
+  rtl_xor(&t1, &id_dest->val, &t2);
+  rtl_and(&t0, &t0, &t1);
+  rtl_msb(&t0, &t0, id_dest->width);
+  rtl_set_OF(&t0);
   print_asm_template1(dec);
 }
 
 make_EHelper(neg) {
-  t0 = -id_dest->val;
-  t1 = (id_dest->val != 0);
-  rtl_set_CF(&t1);
-  t1 = ((id_dest->val < 0) == (-id_dest->val < 0));
-  rtl_set_OF(&t1);
-  rtl_update_ZFSF(&t0, 4);
-  operand_write(id_dest, &t0);
+  //TODO();
+  rtl_set_CF(&id_dest->val);
+  id_dest->val = -id_dest->val;
+  operand_write(id_dest, &id_dest->val);
+
   print_asm_template1(neg);
 }
 
@@ -254,4 +284,19 @@ make_EHelper(idiv) {
   }
 
   print_asm_template1(idiv);
+}
+
+make_EHelper(rol) {
+  union {
+    uint64_t u64;
+    struct {
+      uint32_t u32_l;
+      uint32_t u32_h;
+    };
+  } tmp;
+  tmp.u64 = 0;
+  tmp.u32_l = id_dest->val;
+  tmp.u64 <<= reg_b(R_ECX);
+  tmp.u32_l += tmp.u32_h;
+  operand_write(id_dest, &tmp.u32_l);
 }

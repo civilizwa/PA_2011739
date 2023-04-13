@@ -1,5 +1,6 @@
 #include "nemu.h"
 #include "monitor/monitor.h"
+#include "cpu/reg.h"
 #include <unistd.h>
 #include <sys/prctl.h>
 #include <signal.h>
@@ -128,7 +129,7 @@ void init_qemu_reg() {
 
 void difftest_step(uint32_t eip) {
   union gdb_regs r;
-  bool diff = false;
+  int diff = 0;
 
   if (is_skip_nemu) {
     is_skip_nemu = false;
@@ -149,29 +150,30 @@ void difftest_step(uint32_t eip) {
 
   // TODO: Check the registers state with QEMU.
   // Set `diff` as `true` if they are not the same.
-  if (r.eax != cpu.eax ||
-      r.ecx != cpu.ecx ||
-      r.edx != cpu.edx ||
-      r.ebx != cpu.ebx ||
-      r.esp != cpu.esp ||
-      r.ebp != cpu.ebp ||
-      r.esi != cpu.esi ||
-      r.edi != cpu.edi ||
-      r.eip != cpu.eip) {
-    diff = true;
-    printf("Exception: Different test failed at NEMU EIP 0x%08X, QEMU EIP 0x%08X.\n", cpu.eip, r.eip);
-    printf("QEMU\t\tNEMU\n");
-    printf("EAX = 0x%08X, 0x%08X\n", r.eax, cpu.eax);
-    printf("ECX = 0x%08X, 0x%08X\n", r.ecx, cpu.ecx);
-    printf("EDX = 0x%08X, 0x%08X\n", r.edx, cpu.edx);
-    printf("EBX = 0x%08X, 0x%08X\n", r.ebx, cpu.ebx);
-    printf("ESP = 0x%08X, 0x%08X\n", r.esp, cpu.esp);
-    printf("EBP = 0x%08X, 0x%08X\n", r.ebp, cpu.ebp);
-    printf("ESI = 0x%08X, 0x%08X\n", r.esi, cpu.esi);
-    printf("EDI = 0x%08X, 0x%08X\n", r.edi, cpu.edi);
+  //TODO();
+  int i = 0;
+  for (; i < 8; ++i) {
+    if (r.array[i] != reg_l(i)) {
+      diff = i;
+      break;
+    }
+  }
+  if (r.eip != cpu.eip) {
+    diff = 8;
   }
 
   if (diff) {
     nemu_state = NEMU_END;
+    printf("QEMU:\n");
+    for (i = 0; i < 8; ++i) {
+      printf("\t%s 0x%08x %s\n", regsl[i], r.array[i], diff == i ? "*" : "");
+    }
+    printf("\t%s 0x%08x %s\n", "eip", r.eip, diff == 8 ? "*" : "");
+
+    printf("NEMU:\n");
+    for (i = 0; i < 8; ++i) {
+      printf("\t%s 0x%08x %s\n", regsl[i], reg_l(i), diff == i ? "*" : "");
+    }
+    printf("\t%s 0x%08x %s\n", "eip", cpu.eip, diff == 8 ? "*" : "");
   }
 }

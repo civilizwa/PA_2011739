@@ -45,9 +45,9 @@ uint32_t pio_read(ioaddr_t, int);
 void pio_write(ioaddr_t, int, uint32_t);
 
 make_EHelper(in) {
-  t0 = pio_read(id_src->val, id_dest->width);
-  rtl_sr(R_EAX, id_dest->width, &t0);
-  
+  //TODO();
+  reg_l(R_EAX) = pio_read(reg_w(R_EDX), id_dest->width);
+
   print_asm_template2(in);
 
 #ifdef DIFF_TEST
@@ -56,10 +56,9 @@ make_EHelper(in) {
 }
 
 make_EHelper(out) {
-  t0 = 0;
-  rtl_sr(R_EAX, id_dest->width, &t0);
-  pio_write(id_dest->val, id_src->width, id_src->val);
-  
+  //TODO();
+  pio_write(reg_w(R_EDX), id_dest->width, reg_l(R_EAX));
+
   print_asm_template2(out);
 
 #ifdef DIFF_TEST

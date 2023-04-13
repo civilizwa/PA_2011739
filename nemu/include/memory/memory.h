@@ -2,7 +2,6 @@
 #define __MEMORY_H__
 
 #include "common.h"
-#include "device/mmio.h"
 
 extern uint8_t pmem[];
 
@@ -15,5 +14,10 @@ uint32_t vaddr_read(vaddr_t, int);
 uint32_t paddr_read(paddr_t, int);
 void vaddr_write(vaddr_t, int, uint32_t);
 void paddr_write(paddr_t, int, uint32_t);
+
+#define swaddr_read vaddr_read
+#define swaddr_write vaddr_write
+#define hwaddr_read paddr_read
+#define hwaddr_write paddr_write
 
 #endif

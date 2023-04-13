@@ -2,13 +2,20 @@
 #define __WATCHPOINT_H__
 
 #include "common.h"
+#include "expr.h"
 
 typedef struct watchpoint {
-  int NO;
-  struct watchpoint *next;
+    int NO;
+    int key;
+    struct watchpoint *next;
+    char str[32];
+    /* TODO: Add more members if necessary */
 
-  char expr[32*16+1];
-  int val;
+
 } WP;
+
+extern WP *head;
+WP* new_wp();
+int free_wp(int NO);
 
 #endif
