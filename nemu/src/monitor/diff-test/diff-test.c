@@ -149,25 +149,40 @@ void difftest_step(uint32_t eip) {
 
   // TODO: Check the registers state with QEMU.
   // Set `diff` as `true` if they are not the same.
-
-  
-  for(int i=0;i<8;i++)
-  {
-      if(reg_l(i)!=r.array[i])
-      {
-	  printf("different in reg %s:when nemu.eip=0x%08x\n",regsl[i],reg_l(i));
-	  diff=true;
-      }
-
-  }
-
-  if(cpu.eip!=r.eip)
-  {
-      printf("eip diff:NEMU->0x%08x,QEMU->0x%08x\n",cpu.eip,r.eip);
-      diff=true;
-  }
-
+  if (r.eax != cpu.eax)
+      diff = true;
+  if (r.ecx != cpu.ecx)
+      diff = true;
+  if (r.edx != cpu.edx)
+      diff = true;
+  if (r.ebx != cpu.ebx)
+      diff = true;
+  if (r.esp != cpu.esp)
+      diff = true;
+  if (r.ebp != cpu.ebp)
+      diff = true;
+  if (r.esi != cpu.esi)
+      diff = true;
+  if (r.edi != cpu.edi)
+      diff = true;
+  if (r.eip != cpu.eip)
+      diff = true;
   if (diff) {
+    //nemu_state = NEMU_END;
+    Log("qemu.eax=0x%x, nemu.eax=0x%x", r.eax, cpu.eax);
+    Log("qemu.ecx=0x%x, nemu.ecx=0x%x", r.ecx, cpu.ecx);
+    Log("qemu.edx=0x%x, nemu.edx=0x%x", r.edx, cpu.edx);
+    Log("qemu.ebx=0x%x, nemu.ebx=0x%x", r.ebx, cpu.ebx);
+    Log("qemu.esp=0x%x, nemu.esp=0x%x", r.esp, cpu.esp);
+    Log("qemu.ebp=0x%x, nemu.ebp=0x%x", r.ebp, cpu.ebp);
+    Log("qemu.esi=0x%x, nemu.esi=0x%x", r.esi, cpu.esi);
+    Log("qemu.edi=0x%x, nemu.edi=0x%x", r.edi, cpu.edi);
+    Log("EIP at: qemu.eip=0x%x, nemu.eip=0x%x", r.eip, cpu.eip);
     nemu_state = NEMU_END;
   }
+/*  if (r.eip != cpu.eip) {
+      diff = true;
+      Log("qemu.eip=0x%x, nemu.eip=0x%x", r.eip, cpu.eip);
+  }*/
+
 }
