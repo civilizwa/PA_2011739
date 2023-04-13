@@ -6,11 +6,16 @@
 static WP wp_pool[NR_WP];
 static WP *head, *free_;
 
+WP* new_wp();
+void free_wp(WP *wp);
+
 void init_wp_pool() {
   int i;
   for (i = 0; i < NR_WP; i ++) {
     wp_pool[i].NO = i;
     wp_pool[i].next = &wp_pool[i + 1];
+    wp_pool[i].exp[0] = '\0';
+    wp_pool[i].value = -1;
   }
   wp_pool[NR_WP - 1].next = NULL;
 
@@ -20,110 +25,119 @@ void init_wp_pool() {
 
 /* TODO: Implement the functionality of watchpoint */
 
-WP* new_wp(char* args)
-{
-    if(free_==NULL)
-	assert(0);
-    WP *tmp=free_;
-    free_=free_->next;
-    tmp->next=NULL;
+WP* new_wp() {
+  if (free_ == NULL) {
+    assert(0);
+  }
 
-    bool success;
-    strcpy(tmp->expr,args);
-    tmp->last_value=expr(tmp->expr,&success);
-    assert(success);
+  WP *wp = free_;
+  free_ = free_->next;
+  wp->next = NULL;
 
-    if(head==NULL)
-	head=tmp;
-    else
-    {
-	WP *tmp1=head;
-	while(tmp1->next!=NULL)
-	    tmp1=tmp1->next;
-	tmp1->next=tmp;
-    }
-
-    return tmp;
+  return wp;
 }
 
-
-WP *delete_wp(int num,bool *success)
-{
-    WP *tmp=head;
-    while(tmp!=NULL&&tmp->NO!=num)
-        tmp=tmp->next;
-    if(tmp==NULL)
-        *success=false;
-    return tmp;
-
+void free_wp(WP *wp) {
+  wp->exp[0] = '\0';
+  wp->value = -1;
+  wp->next = free_;
+  free_ = wp;
 }
 
+void insert_wp(char *args) {
+  bool flag = true;
+  uint32_t val = expr(args, &flag);
 
+  if (!flag) {
+    printf("You input an invalid expression, failed to create watchpoint!");
+    return ;
+  }  
 
-void free_wp(WP* wp)
-{
-    if(wp==NULL)
-    {
-	printf("watchpoint is nullptr\n");
-	assert(0);
+  WP *wp = new_wp();
+  wp->value = val;
+  strcpy(wp->exp, args);
+
+  if (head == NULL) {
+    wp->NO = 1;
+    head = wp;
+  }
+  else {
+    WP *wwp;
+    wwp = head;
+    while (wwp->next != NULL) {
+      wwp = wwp->next;
     }
-    if(wp==head)
-	head=head->next;
-    else
-    {
-	WP *tmp=head;
-	while(tmp->next!=wp && tmp!=NULL)
-	    tmp=tmp->next;
-	tmp->next=tmp->next->next;
-    }
+    wp->NO = wwp->NO + 1;
+    wwp->next = wp;
+  }
 
-
-    wp->next=free_;
-    free_=wp;
-    wp->expr[0]='\0';
-    wp->last_value=0;
-
+  return ;
 }
 
+void delete_wp(int no) {
 
-bool watch_wp()
-{
-    bool success;
-    int value;
-    WP *tmp=head;
-    if(head==NULL)
-	return false;
-    while(tmp!=NULL)
-    {
-	value=expr(tmp->expr,&success);
-	if(value!=tmp->last_value)
-	{
-	    printf("watchpoint  NO : %d  expr : %s\n",tmp->NO,tmp->expr);
-	    printf("oldvalue: %d\t newvalue: %d\n",tmp->last_value,value);
-            tmp->last_value=value;
-            //tmp=tmp->next;
-	    return true;
-	}
-	tmp=tmp->next;
+  if (head == NULL) {
+    printf("There is no watchpoint to delete!");
+    return ;
+  }
+
+  WP *wp;
+  if (head->NO == no) {
+    wp = head;
+    head = head->next;
+    free_wp(wp);
+  }
+  else {
+    wp = head;
+    while (wp->next != NULL && wp->next->NO != no) {
+      wp = wp->next;
     }
-    return false;
+    if (wp == NULL) {
+      printf("Failed to find the NO.%d watchpoint!", no);
+    }
+    else {
+      WP *del_wp;
+      del_wp = wp->next;
+      wp->next = del_wp->next;
+      free_wp(del_wp);
+      printf("NO.%d  watchpoint has been deleted!\n", no);
+    }
+  }
+
+  return ;
 }
 
+void display_wp() {
+  if (head == NULL) {
+    printf("There is no watchpoint!\n");
+    return ;
+  }
 
-void print_wp()
-{
-    if(head==NULL)
-    {
-	printf("No watchpoint now\n");
-	return ;
-    }
-
-    WP *tmp=head;
-    while(tmp!=NULL)
-    {
-	printf("watchpoint  NO : %d  expr : %s\n",tmp->NO,tmp->expr);
-        tmp=tmp->next;
-    }
-
+  WP *wp;
+  printf("NO      expression        value\n");
+  wp = head;
+  while (wp != NULL) {
+    printf("%-5d   %-15s   %-16u\n", wp->NO, wp->exp, wp->value);
+    wp = wp->next;
+  }
 }
 
+int * haschanged() {
+  WP *wp = head;
+  bool flag = true;
+  uint32_t val;
+  static int no[NR_WP];
+  int i = 0;
+
+  while (wp != NULL) {
+    val = expr(wp->exp, &flag);
+    if (val != wp->value) {
+      wp->value = val;
+      no[i++] = wp->NO;
+    }
+      wp = wp->next;
+  }
+  no[i] = -1;
+
+  return no;
+}
