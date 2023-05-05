@@ -39,15 +39,10 @@ static inline make_DopHelper(SI) {
    op->simm = ???
    */
   //TODO();
-  if (op->width == 1) {
-    int8_t tmp = (int8_t)instr_fetch(eip, 1);
-    op->simm = (int32_t)tmp;
+  op -> simm = instr_fetch(eip, op -> width);
+  if(op -> width == 1) {
+    op -> simm = (int8_t)op -> simm;
   }
-  else {
-    int32_t tmp = (int32_t)instr_fetch(eip, 4);
-    op->simm = (int32_t)tmp;
-  }
-
 
   rtl_li(&op->val, op->simm);
 
@@ -203,10 +198,6 @@ make_DHelper(gp7_E) {
 /* used by test in group3 */
 make_DHelper(test_I) {
   decode_op_I(eip, id_src, true);
-}
-
-make_DHelper(SI) {
-  decode_op_SI(eip, id_dest, true);
 }
 
 make_DHelper(SI2E) {

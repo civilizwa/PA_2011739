@@ -1,7 +1,21 @@
 #include "cpu/exec.h"
 
+static inline void eflags_modify() {
+  rtl_sub(&t2, &id_dest -> val, &id_src -> val);
+  rtl_update_ZFSF(&t2, id_dest -> width);
+  rtl_sltu(&t0, &id_dest -> val, &id_src -> val);
+  rtl_set_CF(&t0);
+  rtl_xor(&t0, &id_dest->val, &id_src->val);
+  rtl_xor(&t1, &id_dest->val, &t2);
+  rtl_and(&t0, &t0, &t1);
+  rtl_msb(&t0, &t0, id_dest->width);
+  rtl_set_OF(&t0);
+}
+
+
 make_EHelper(add) {
-  //TODO();
+  // TODO();
+
   rtl_add(&t2, &id_dest->val, &id_src->val);
   operand_write(id_dest, &t2);
 
@@ -10,102 +24,68 @@ make_EHelper(add) {
   rtl_sltu(&t0, &t2, &id_dest->val);
   rtl_set_CF(&t0);
 
-  rtl_xor(&t0, &id_dest->val, &id_src->val);
-  rtl_not(&t0);
+  rtl_xor(&t0, &id_src->val, &t2);
   rtl_xor(&t1, &id_dest->val, &t2);
   rtl_and(&t0, &t0, &t1);
   rtl_msb(&t0, &t0, id_dest->width);
   rtl_set_OF(&t0);
-
   print_asm_template2(add);
 }
 
 make_EHelper(sub) {
-  //TODO();
-  rtl_sub(&t2, &id_dest->val, &id_src->val);
+  // TODO();
+
+  eflags_modify();
   operand_write(id_dest, &t2);
-
-  rtl_update_ZFSF(&t2, id_dest->width);
-
-  rtl_sltu(&t0, &id_dest->val, &t2);
-  rtl_set_CF(&t0);
-
-  rtl_xor(&t0, &id_dest->val, &id_src->val);
-  rtl_xor(&t1, &id_dest->val, &t2);
-  rtl_and(&t0, &t0, &t1);
-  rtl_msb(&t0, &t0, id_dest->width);
-  rtl_set_OF(&t0);
-
   print_asm_template2(sub);
 }
 
 make_EHelper(cmp) {
-  //TODO();
-  rtl_sub(&t2, &id_dest->val, &id_src->val);
+  // TODO();
 
-  rtl_update_ZFSF(&t2, id_dest->width);
-
-  rtl_sltu(&t0, &id_dest->val, &t2);
-  rtl_set_CF(&t0);
-
-  rtl_xor(&t0, &id_dest->val, &id_src->val);
-  rtl_xor(&t1, &id_dest->val, &t2);
-  rtl_and(&t0, &t0, &t1);
-  rtl_msb(&t0, &t0, id_dest->width);
-  rtl_set_OF(&t0);
+  eflags_modify();
 
   print_asm_template2(cmp);
 }
 
 make_EHelper(inc) {
   //TODO();
-  t1 = 1;
-  rtl_add(&t2, &id_dest->val, &t1);
+
+  rtl_addi(&t2, &id_dest->val, 1);
   operand_write(id_dest, &t2);
-
   rtl_update_ZFSF(&t2, id_dest->width);
-
-  rtl_sltu(&t0, &t2, &id_dest->val);
-
-  rtl_xor(&t0, &id_dest->val, &id_src->val);
-  rtl_not(&t0);
-  rtl_xor(&t1, &id_dest->val, &t2);
-  rtl_and(&t0, &t0, &t1);
-  rtl_msb(&t0, &t0, id_dest->width);
+  rtl_eqi(&t0, &t2, 0x80000000);
   rtl_set_OF(&t0);
-
   print_asm_template1(inc);
 }
 
 make_EHelper(dec) {
-  //TODO();
-  t1 = 1;
-  rtl_sub(&t2, &id_dest->val, &t1);
+  // TODO();
+
+  rtl_subi(&t2, &id_dest->val, 1);
   operand_write(id_dest, &t2);
-
   rtl_update_ZFSF(&t2, id_dest->width);
-
-  rtl_sltu(&t0, &id_dest->val, &t2);
-
-  rtl_xor(&t0, &id_dest->val, &id_src->val);
-  rtl_xor(&t1, &id_dest->val, &t2);
-  rtl_and(&t0, &t0, &t1);
-  rtl_msb(&t0, &t0, id_dest->width);
+  rtl_eqi(&t0, &t2, 0x7fffffff);
   rtl_set_OF(&t0);
   print_asm_template1(dec);
 }
 
 make_EHelper(neg) {
-  //TODO();
-  rtl_set_CF(&id_dest->val);
-  id_dest->val = -id_dest->val;
-  operand_write(id_dest, &id_dest->val);
+  // TODO();
 
+  rtl_sub(&t2, &tzero, &id_dest->val);
+  rtl_update_ZFSF(&t2, id_dest->width);
+  rtl_neq0(&t0,&id_dest->val);
+  rtl_set_CF(&t0);
+  rtl_eqi(&t0,&id_dest->val,0x80000000);
+  rtl_set_OF(&t0);
+  operand_write(id_dest,&t2);
   print_asm_template1(neg);
 }
 
 make_EHelper(adc) {
   rtl_add(&t2, &id_dest->val, &id_src->val);
+  rtl_sltu(&t3, &t2, &id_dest->val);
   rtl_get_CF(&t1);
   rtl_add(&t2, &t2, &t1);
   operand_write(id_dest, &t2);
@@ -113,6 +93,7 @@ make_EHelper(adc) {
   rtl_update_ZFSF(&t2, id_dest->width);
 
   rtl_sltu(&t0, &t2, &id_dest->val);
+  rtl_or(&t0, &t3, &t0);
   rtl_set_CF(&t0);
 
   rtl_xor(&t0, &id_dest->val, &id_src->val);
@@ -127,6 +108,7 @@ make_EHelper(adc) {
 
 make_EHelper(sbb) {
   rtl_sub(&t2, &id_dest->val, &id_src->val);
+  rtl_sltu(&t3, &id_dest->val, &t2);
   rtl_get_CF(&t1);
   rtl_sub(&t2, &t2, &t1);
   operand_write(id_dest, &t2);
@@ -134,6 +116,7 @@ make_EHelper(sbb) {
   rtl_update_ZFSF(&t2, id_dest->width);
 
   rtl_sltu(&t0, &id_dest->val, &t2);
+  rtl_or(&t0, &t3, &t0);
   rtl_set_CF(&t0);
 
   rtl_xor(&t0, &id_dest->val, &id_src->val);
@@ -284,19 +267,4 @@ make_EHelper(idiv) {
   }
 
   print_asm_template1(idiv);
-}
-
-make_EHelper(rol) {
-  union {
-    uint64_t u64;
-    struct {
-      uint32_t u32_l;
-      uint32_t u32_h;
-    };
-  } tmp;
-  tmp.u64 = 0;
-  tmp.u32_l = id_dest->val;
-  tmp.u64 <<= reg_b(R_ECX);
-  tmp.u32_l += tmp.u32_h;
-  operand_write(id_dest, &tmp.u32_l);
 }

@@ -1,6 +1,5 @@
 #include "nemu.h"
 #include "monitor/monitor.h"
-#include "cpu/reg.h"
 #include <unistd.h>
 #include <sys/prctl.h>
 #include <signal.h>
@@ -129,7 +128,7 @@ void init_qemu_reg() {
 
 void difftest_step(uint32_t eip) {
   union gdb_regs r;
-  int diff = 0;
+  bool diff = false;
 
   if (is_skip_nemu) {
     is_skip_nemu = false;
@@ -147,33 +146,46 @@ void difftest_step(uint32_t eip) {
 
   gdb_si();
   gdb_getregs(&r);
-
   // TODO: Check the registers state with QEMU.
   // Set `diff` as `true` if they are not the same.
-  //TODO();
-  int i = 0;
-  for (; i < 8; ++i) {
-    if (r.array[i] != reg_l(i)) {
-      diff = i;
-      break;
-    }
+  // TODO();
+  if(r.eax!=cpu.eax) {
+    printf("expect: %d true: %d at: %x\n", r.eax, cpu.eax, cpu.eip);
+    diff=true;
   }
-  if (r.eip != cpu.eip) {
-    diff = 8;
+  if(r.ecx!=cpu.ecx) {
+    printf("expect: %d true: %d at: %x \n", r.ecx, cpu.ecx, cpu.eip);
+    diff=true;
   }
-
+  if(r.edx!=cpu.edx) {
+    printf("expect: %d true: %d at: %x\n", r.edx, cpu.edx, cpu.eip);
+    diff=true;
+  }
+  if(r.ebx!=cpu.ebx) {
+    printf("expect: %d true: %d at: %x\n", r.ebx, cpu.ebx, cpu.eip);
+    diff=true;
+  }
+  if(r.esp!=cpu.esp) {
+    printf("expect: %d true: %d at: %x\n", r.esp, cpu.esp, cpu.eip);
+	  diff=true;
+  }
+  if(r.ebp!=cpu.ebp) {
+    printf("expect: %d true: %d at: %x\n", r.ebp, cpu.ebp, cpu.eip);
+	  diff=true;
+  }
+  if(r.esi!=cpu.esi) {
+    printf("expect: %d true: %d at: %x\n", r.esi, cpu.esi, cpu.eip);
+	  diff=true;
+  }
+  if(r.edi!=cpu.edi) {
+    printf("expect: %d true: %d at: %x\n", r.edi, cpu.edi, cpu.eip);
+	  diff=true;
+  }
+  if(r.eip!=cpu.eip) {
+	  diff=true;
+	  Log("different:qemu.eip=0x%x,nemu.eip=0x%x",r.eip,cpu.eip);
+  }
   if (diff) {
     nemu_state = NEMU_END;
-    printf("QEMU:\n");
-    for (i = 0; i < 8; ++i) {
-      printf("\t%s 0x%08x %s\n", regsl[i], r.array[i], diff == i ? "*" : "");
-    }
-    printf("\t%s 0x%08x %s\n", "eip", r.eip, diff == 8 ? "*" : "");
-
-    printf("NEMU:\n");
-    for (i = 0; i < 8; ++i) {
-      printf("\t%s 0x%08x %s\n", regsl[i], reg_l(i), diff == i ? "*" : "");
-    }
-    printf("\t%s 0x%08x %s\n", "eip", cpu.eip, diff == 8 ? "*" : "");
   }
 }

@@ -2,20 +2,21 @@
 #define __WATCHPOINT_H__
 
 #include "common.h"
-#include "expr.h"
 
 typedef struct watchpoint {
-    int NO;
-    int key;
-    struct watchpoint *next;
-    char str[32];
-    /* TODO: Add more members if necessary */
+  int NO;
+  struct watchpoint *next;
 
+  /* TODO: Add more members if necessary */
+  int old; //旧的值
+  char e[32]; //表达式
+  int hitNum; //记录触发次数
 
 } WP;
 
-extern WP *head;
-WP* new_wp();
-int free_wp(int NO);
+bool new_wp(char *arg);
+bool free_wp(int num);
+void print_wp();
+bool watch_wp();
 
 #endif

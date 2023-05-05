@@ -5,20 +5,23 @@ make_EHelper(nop) {
   print_asm("nop");
 }
 
+
+make_EHelper(endbr) {
+    instr_fetch(eip, id_src -> width);
+    print_asm("endbr32");
+}
+
+
 make_EHelper(inv) {
   /* invalid opcode */
 
   uint32_t temp[2];
   vaddr_t ori_eip = cpu.eip;
-  instr_fetch(eip, 4);
-  instr_fetch(eip, 2);
   *eip = ori_eip;
-  temp[0] = vaddr_read(*eip, 4);
-  temp[1] = vaddr_read(*eip + 4, 4);
-  *eip += 8;
+  temp[0] = instr_fetch(eip, 4);
+  temp[1] = instr_fetch(eip, 4);
 
   uint8_t *p = (void *)temp;
-  p[0] = vaddr_read(ori_eip, 1);
   printf("invalid opcode(eip = 0x%08x): %02x %02x %02x %02x %02x %02x %02x %02x ...\n\n",
       ori_eip, p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]);
 
