@@ -2,6 +2,13 @@
 #include "syscall.h"
 #include "fs.h"
 #include "arch.h"
+int sys_none() {
+  return 1;
+}
+
+void sys_exit(int a){
+  _halt(a);
+}
 
 _RegSet* do_syscall(_RegSet *r) {
   uintptr_t a[4];
