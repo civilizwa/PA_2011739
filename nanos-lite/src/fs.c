@@ -113,3 +113,20 @@ ssize_t fs_read(int fd, void *buf, size_t len){
   set_open_offset(fd, get_open_offset(fd) + n);
   return n;
 }
+
+off_t fs_lseek(int fd, off_t offset, int whence) {
+  switch(whence) {
+    case SEEK_SET:
+      set_open_offset(fd, offset);
+      return get_open_offset(fd);
+    case SEEK_CUR:
+      set_open_offset(fd, get_open_offset(fd) + offset);
+      return get_open_offset(fd);
+    case SEEK_END:
+      set_open_offset(fd, fs_filesz(fd) + offset);
+      return get_open_offset(fd);
+    default:
+      panic("Unhandled whence ID = %d", whence);
+      return -1;
+    }
+}
