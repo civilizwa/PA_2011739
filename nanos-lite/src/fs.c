@@ -24,10 +24,15 @@ static Finfo file_table[] __attribute__((used)) = {
 
 void init_fs() {
   // TODO: initialize the size of /dev/fb
+  extern void getScreen(int *p_width, int *p_height);
+  int width = 0;
+  int height = 0;
+  getScreen(&width, &height);
+  file_table[FD_FB].size = width * height * sizeof(u_int32_t);
+  Log("set FD_FB size = %d", file_table[FD_FB].size);
 }
 
-extern void ramdisk_read(void *buf, off_t offset, size_t len);
-extern void ramdisk_write(const void *buf, off_t offset, size_t len);
+
 
 size_t fs_fliesz(int fd) {
   assert(fd >= 0 && fd < NR_FILES);
@@ -53,6 +58,9 @@ void set_open_offset(int fd,off_t n){
 	file_table[fd].open_offset = n;
 }
 
+extern void ramdisk_read(void *buf, off_t offset, size_t len);
+extern void ramdisk_write(const void *buf, off_t offset, size_t len);
+
 int fs_open(const char*filename, int flags, int mode) {
 	for(int i = 0; i < NR_FILES; i++){
 		if(strcmp(filename, file_table[i].name) == 0) {
@@ -63,6 +71,7 @@ int fs_open(const char*filename, int flags, int mode) {
 	panic("this file not exist");
 	return -1;
 }
+
 
 extern void fb_write(const void *buf, off_t offset, size_t len);
 ssize_t fs_write(int fd, void *buf, size_t len){
@@ -83,10 +92,6 @@ ssize_t fs_write(int fd, void *buf, size_t len){
   }
   set_open_offset(fd, get_open_offset(fd) + n);
   return n;
-}
-int fs_close(int fd) {
-  assert(fd >= 0 && fd < NR_FILES);
-  return 0;
 }
 
 void dispinfo_read(void *buf, off_t offset, size_t len);
@@ -112,6 +117,16 @@ ssize_t fs_read(int fd, void *buf, size_t len){
   }
   set_open_offset(fd, get_open_offset(fd) + n);
   return n;
+}
+
+int fs_close(int fd) {
+  assert(fd >= 0 && fd < NR_FILES);
+  return 0;
+}
+
+size_t fs_filesz(int fd) {
+  assert(fd >= 0 && fd < NR_FILES);
+  return file_table[fd].size;
 }
 
 off_t fs_lseek(int fd, off_t offset, int whence) {
