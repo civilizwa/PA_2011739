@@ -8,8 +8,9 @@ extern uint8_t ramdisk_end;
 #define RAMDISK_SIZE ((&ramdisk_end) - (&ramdisk_start))
 
 extern void ramdisk_read(void *buf, off_t offset, size_t len);
+extern size_t get_ramdisk_size();
 
 uintptr_t loader(_Protect *as, const char *filename) {
-  ramdisk_read(DEFAULT_ENTRY,0,RAMDISK_SIZE);
+  ramdisk_read(DEFAULT_ENTRY,0,get_ramdisk_size());
   return (uintptr_t)DEFAULT_ENTRY;
 }
