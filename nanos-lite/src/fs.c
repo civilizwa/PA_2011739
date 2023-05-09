@@ -52,3 +52,35 @@ void set_open_offset(int fd,off_t n){
 	}
 	file_table[fd].open_offset = n;
 }
+
+int fs_open(const char*filename, int flags, int mode) {
+	for(int i = 0; i < NR_FILES; i++){
+		if(strcmp(filename, file_table[i].name) == 0) {
+			Log("success open:%d:%s",i,filename);
+			return i;
+		}
+	}
+	panic("this file not exist");
+	return -1;
+}
+
+extern void fb_write(const void *buf, off_t offset, size_t len);
+ssize_t fs_write(int fd, void *buf, size_t len){
+  assert(fd >= 0 && fd < NR_FILES);
+  if(fd < 3 || fd == FD_DISPINFO) {
+    Log("arg invalid:fd<3");
+    return 0;
+  }
+  int n = fs_fliesz(fd) - get_open_offset(fd);
+  if(n > len) {
+    n = len;
+  }
+  if(fd == FD_FB){
+    fb_write(buf, get_open_offset(fd), n);
+  }
+  else {
+    ramdisk_write(buf, disk_offset(fd) + get_open_offset(fd), n);
+  }
+  set_open_offset(fd, get_open_offset(fd) + n);
+  return n;
+}
