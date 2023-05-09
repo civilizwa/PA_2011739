@@ -84,3 +84,7 @@ ssize_t fs_write(int fd, void *buf, size_t len){
   set_open_offset(fd, get_open_offset(fd) + n);
   return n;
 }
+int fs_close(int fd) {
+  assert(fd >= 0 && fd < NR_FILES);
+  return 0;
+}
