@@ -5,6 +5,8 @@ void raise_intr(uint8_t NO, vaddr_t ret_addr) {
   /* TODO: Trigger an interrupt/exception with ``NO''.
    * That is, use ``NO'' to index the IDT.
    */
+
+  // TODO();
   memcpy(&t1, &cpu.eflags, sizeof(cpu.eflags));
   rtl_li(&t0, t1);
   rtl_push(&t0);

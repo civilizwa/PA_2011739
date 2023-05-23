@@ -18,7 +18,22 @@ make_EHelper(pop) {
   print_asm_template1(pop);
 }
 
+make_EHelper(movsb) {
+  rtl_get_ZF(&t0);
+  uint8_t data=vaddr_read(cpu.ds + cpu.esi,1);
+  vaddr_write(cpu.es + cpu.edi, 1, data);
+  if(!t0) {
+    cpu.esi+=1;
+    cpu.edi+=1;
+  } else {
+    cpu.esi-=1;
+    cpu.edi-=1;
+  }
+  print_asm_template2(movsb);
+}
+
 make_EHelper(pusha) {
+  // TODO();
   t0 = cpu.esp;
   rtl_push(&cpu.eax);
   rtl_push(&cpu.ecx);
@@ -33,6 +48,7 @@ make_EHelper(pusha) {
 }
 
 make_EHelper(popa) {
+  // TODO();
   rtl_pop(&cpu.edi);
   rtl_pop(&cpu.esi);
   rtl_pop(&cpu.ebp);
@@ -41,7 +57,6 @@ make_EHelper(popa) {
   rtl_pop(&cpu.edx);
   rtl_pop(&cpu.ecx);
   rtl_pop(&cpu.eax);
-
   print_asm("popa");
 }
 
