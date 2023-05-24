@@ -10,6 +10,7 @@ void init_device(void);
 void init_irq(void);
 void init_fs(void);
 uint32_t loader(_Protect *, const char *);
+void load_prog(const char *filename);
 
 int main() {
 #ifdef HAS_PTE
@@ -30,10 +31,8 @@ int main() {
 
   init_fs();
 
-  extern void load_prog(const char *filename);
   load_prog("/bin/pal");
   load_prog("/bin/hello");
-  load_prog("/bin/videotest");
 
   _trap();
 

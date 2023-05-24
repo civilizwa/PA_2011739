@@ -5,74 +5,105 @@ make_EHelper(mov) {
   print_asm_template2(mov);
 }
 
+make_EHelper(movfromc) {
+  sprintf(id_dest->str, "%s", id_src->str);
+  if(id_dest->reg == 0) {
+    rtl_sr(id_src->reg, id_src->width, &cpu.cr0);
+    sprintf(id_src->str, "cr0");
+  }
+  else if(id_dest->reg == 3) {
+    rtl_sr(id_src->reg, id_src->width, &cpu.cr3);
+    sprintf(id_src->str, "cr3");
+  }
+  else
+    panic("Unexpected control register at 0x%08X\n", cpu.eip);
+  print_asm_template2(mov);
+}
+
+make_EHelper(movtoc) {
+  sprintf(id_dest->str, "cr%d", id_dest->reg);
+  if(id_dest->reg == 0) {
+    cpu.cr0 = id_src->val;
+  }
+  else if(id_dest->reg == 3) {
+    cpu.cr3 = id_src->val;
+  }
+  else
+    panic("Unexpected control register at 0x%08X\n", cpu.eip);
+  print_asm_template2(mov);
+}
+
 make_EHelper(push) {
-	if (id_dest->width == 1) {
-		id_dest->val = (int32_t)(int8_t)id_dest->val;
-	}
-	rtl_push(&id_dest->val);
+  t0 = id_dest->val;
+  rtl_push(&t0);
   print_asm_template1(push);
 }
 
 make_EHelper(pop) {
-	rtl_pop(&t0);
-	operand_write(id_dest, &t0);
+  rtl_pop(&t0);
+  rtl_sr(id_dest->reg, id_dest->width, &t0);
   print_asm_template1(pop);
 }
 
 make_EHelper(pusha) {
-	t0 = cpu.esp;
-	rtl_push(&cpu.eax);
-  rtl_push(&cpu.ecx);
-  rtl_push(&cpu.edx);
-  rtl_push(&cpu.ebx);
+  t1 = cpu.esp;
+  t0 = cpu.eax;
   rtl_push(&t0);
-  rtl_push(&cpu.ebp);
-  rtl_push(&cpu.esi);
-  rtl_push(&cpu.edi);
-
-	print_asm("pusha");
+  t0 = cpu.ecx;
+  rtl_push(&t0);
+  t0 = cpu.edx;
+  rtl_push(&t0);
+  t0 = cpu.ebx;
+  rtl_push(&t0);
+  rtl_push(&t1);
+  t0 = cpu.ebp;
+  rtl_push(&t0);
+  t0 = cpu.esi;
+  rtl_push(&t0);
+  t0 = cpu.edi;
+  rtl_push(&t0);
+  print_asm("pusha");
 }
 
 make_EHelper(popa) {
-	rtl_pop(&cpu.edi);
-	rtl_pop(&cpu.esi);
-  rtl_pop(&cpu.ebp);
   rtl_pop(&t0);
-  rtl_pop(&cpu.ebx);
-  rtl_pop(&cpu.edx);
-  rtl_pop(&cpu.ecx);
-  rtl_pop(&cpu.eax);
-
+  cpu.edi = t0;
+  rtl_pop(&t0);
+  cpu.esi = t0;
+  rtl_pop(&t0);
+  cpu.ebp = t0;
+  rtl_pop(&t0); // throw esp
+  rtl_pop(&t0);
+  cpu.ebx = t0;
+  rtl_pop(&t0);
+  cpu.edx = t0;
+  rtl_pop(&t0);
+  cpu.ecx = t0;
+  rtl_pop(&t0);
+  cpu.eax = t0;
   print_asm("popa");
 }
 
 make_EHelper(leave) {
-	rtl_mv(&cpu.esp, &cpu.ebp);
-	rtl_pop(&cpu.ebp);
-
+  reg_l(4) = reg_l(5);
+  rtl_pop(&t0);
+  reg_w(5) = t0;
+  
   print_asm("leave");
 }
 
 make_EHelper(cltd) {
   if (decoding.is_operand_size_16) {
-  	rtl_lr(&t0, R_AX, 2);
-		if ((int32_t)(int16_t)(uint16_t)t0 < 0) {
-			rtl_addi(&t1, &tzero, 0xffff);
-			rtl_sr(R_DX, 2, &t1);
-		}
-		else {
-			rtl_sr(R_DX, 2, &tzero);
-		}
-	}
+    if(((int)reg_l(0)) < 0)
+        reg_w(2) = 0xFFFF;
+    else
+        reg_w(2) = 0;
+  }
   else {
-    rtl_lr(&t0, R_EAX, 4);
-		if ((int32_t)t0 < 0) {
-			rtl_addi(&t1, &tzero, 0xffffffff);
-			rtl_sr(R_EDX, 4, &t1);
-		}
-		else {
-			rtl_sr(R_EDX, 4, &tzero);
-		}
+    if(((int)reg_l(0)) < 0)
+        reg_l(2) = 0xFFFFFFFF;
+    else
+        reg_l(2) = 0;
   }
 
   print_asm(decoding.is_operand_size_16 ? "cwtl" : "cltd");
@@ -80,15 +111,15 @@ make_EHelper(cltd) {
 
 make_EHelper(cwtl) {
   if (decoding.is_operand_size_16) {
-  	rtl_lr(&t0, R_AL, 1);
-    t0 = (int16_t)(int8_t)(uint8_t)t0;
-    rtl_sr(R_AX, 2, &t0);
-	}
+    t1 = reg_b(0);
+    rtl_sext(&t0, &t1, 1);
+    reg_w(0) = t0;
+  }
   else {
-	  rtl_lr(&t0, R_AX, 2);
-    t0 = (int32_t)(int16_t)(uint16_t)t0;
-    rtl_sr(R_EAX, 4, &t0);
-	}
+    t1 = reg_w(0);
+    rtl_sext(&t0, &t1, 2);
+    reg_l(0) = t0;
+  }
 
   print_asm(decoding.is_operand_size_16 ? "cbtw" : "cwtl");
 }

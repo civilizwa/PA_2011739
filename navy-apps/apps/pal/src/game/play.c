@@ -515,12 +515,12 @@ PAL_StartFrame(
    {
       return;
    }
-
+   
    //
    // Update the positions and gestures of party members
    //
    PAL_UpdateParty();
-
+   
    //
    // Update the scene
    //

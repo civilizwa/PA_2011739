@@ -7,14 +7,15 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 
-int trans(char *e);
+extern CPU_state cpu;
+
+uint32_t expr(char *e, bool *success, bool isphysicaladdr);
+
+void create_wp(char* expr, int val);
+void remove_wp(int NO);
+void print_wp();
+
 void cpu_exec(uint64_t);
-void init_regex();
-void display_wp();
-void insert_wp(char *args);
-void delete_wp(int no);
-uint32_t expr(char *e, bool *success);
-uint32_t vaddr_read(vaddr_t addr, int len);
 
 /* We use the `readline' library to provide more flexibility to read from stdin. */
 char* rl_gets() {
@@ -43,13 +44,247 @@ static int cmd_q(char *args) {
   return -1;
 }
 
+static int cmd_si(char *args) {
+  char *arg = strtok(NULL, " ");
+  int i;
+
+  if (arg == NULL) {
+    cpu_exec(1);
+  }
+  else {
+    i = atoi(args);
+    if(i < 0) {
+        printf("Exception: Unexpected instruction count \'%s\'.\n", arg);
+    }
+    else
+        cpu_exec(i);
+  }
+  return 0;
+}
+
+static int cmd_info(char *args) {
+  char *arg = strtok(NULL, " ");
+  int i;
+
+  if (arg == NULL) {
+    printf("Exception: Subcommand SUBCMD is required.\n");
+  }
+  else {
+    if (strcmp(arg, "r") == 0) {
+      for (i = 0; i < 8; i++) {
+        printf("%s: 0x%08X\n", reg_name(i, 4), reg_l(i));
+      }
+      printf("eip: 0x%08X\n", cpu.eip);
+    }
+    else if (strcmp(arg, "w") == 0) {
+      print_wp();
+    }
+    else {
+      printf("Exception: Unknown subcommand \'%s\'.\n", arg);
+    }
+  }
+  return 0;
+}
+
+static int cmd_p(char *args) {
+  uint32_t i;
+  bool success;
+
+
+  if (args == NULL) {
+    printf("Exception: Expression field EXPR is required.\n");
+  }
+  else {
+    i = expr(args, &success, false);
+    if (success)
+      printf("Result = %d\n       = 0x%08X\n", i, i);
+  }
+  return 0;
+}
+
+static int cmd_x(char *args) {
+  char *arg = strtok(NULL, " ");
+  uint32_t N;
+  uint32_t Add;
+  char *exp = strtok(NULL, " ");  
+  bool success;
+  uint32_t MemContent;
+  bool IsFirst = true;
+  unsigned char ByteNow;
+
+  if (arg == NULL || exp == NULL) {
+    printf("Exception: Count field N and Expression field EXPR is required.\n");
+  }
+  else {
+    N = atoi(arg);
+    if (N <= 0)
+      printf("Exception: N must be greater than 0.\n");
+    else {
+      Add = expr(exp, &success, false);
+      if (!success)
+        printf("Exception: Unexpected address \'%s\'.\n", args + strlen(arg) + 1);
+      else {
+        printf("%d byte(s) of memory mapped from 0x%08X:\n\n", 4 * N, Add);
+        printf("            00 01 02 03 04 05 06 07\n\n");
+        while (N--) {
+          MemContent = vaddr_read(Add, 4);
+          if (IsFirst) {
+            printf("0x%08X  ", Add);
+          }
+          ByteNow = MemContent & 0xFF;
+          printf("%02X ", ByteNow);
+          MemContent = MemContent >> 8;
+          ByteNow = MemContent & 0xFF;
+          printf("%02X ", ByteNow);
+          MemContent = MemContent >> 8;
+          ByteNow = MemContent & 0xFF;
+          printf("%02X ", ByteNow);
+          MemContent = MemContent >> 8;
+          ByteNow = MemContent & 0xFF;
+          printf("%02X ", ByteNow);
+          if (!IsFirst)
+              printf("\n");
+          IsFirst = !IsFirst;
+          Add += 4;
+        }
+      }
+      if (!IsFirst)
+        printf("\n");
+    }
+  }
+  return 0;
+}
+
+static int cmd_pp(char *args) {
+  uint32_t i;
+  bool success;
+
+
+  if (args == NULL) {
+    printf("Exception: Expression field EXPR is required.\n");
+  }
+  else {
+    i = expr(args, &success, true);
+    if (success)
+      printf("Result = %d\n       = 0x%08X\n", i, i);
+  }
+  return 0;
+}
+
+static int cmd_xp(char *args) {
+  char *arg = strtok(NULL, " ");
+  uint32_t N;
+  uint32_t Add;
+  char *exp = strtok(NULL, " ");  
+  bool success;
+  uint32_t MemContent;
+  bool IsFirst = true;
+  unsigned char ByteNow;
+
+  if (arg == NULL || exp == NULL) {
+    printf("Exception: Count field N and Expression field EXPR is required.\n");
+  }
+  else {
+    N = atoi(arg);
+    if (N <= 0)
+      printf("Exception: N must be greater than 0.\n");
+    else {
+      Add = expr(exp, &success, true);
+      if (!success)
+        printf("Exception: Unexpected address \'%s\'.\n", args + strlen(arg) + 1);
+      else {
+        printf("%d byte(s) of memory mapped from 0x%08X:\n\n", 4 * N, Add);
+        printf("            00 01 02 03 04 05 06 07\n\n");
+        while (N--) {
+          MemContent = paddr_read(Add, 4);
+          if (IsFirst) {
+            printf("0x%08X  ", Add);
+          }
+          ByteNow = MemContent & 0xFF;
+          printf("%02X ", ByteNow);
+          MemContent = MemContent >> 8;
+          ByteNow = MemContent & 0xFF;
+          printf("%02X ", ByteNow);
+          MemContent = MemContent >> 8;
+          ByteNow = MemContent & 0xFF;
+          printf("%02X ", ByteNow);
+          MemContent = MemContent >> 8;
+          ByteNow = MemContent & 0xFF;
+          printf("%02X ", ByteNow);
+          if (!IsFirst)
+              printf("\n");
+          IsFirst = !IsFirst;
+          Add += 4;
+        }
+      }
+      if (!IsFirst)
+        printf("\n");
+    }
+  }
+  return 0;
+}
+
+static int cmd_pa(char *args) {
+  uint32_t i;
+  bool success;
+
+
+  if (args == NULL) {
+    printf("Exception: Expression field EXPR is required.\n");
+  }
+  else {
+    i = expr(args, &success, true);
+    i = page_translate(i, false);
+    if (success)
+      printf("Result = 0x%08X\n", i);
+  }
+  return 0;
+}
+
+static int cmd_w(char *args) {
+  bool success;
+  int val;
+
+  if (args == NULL) {
+    printf("Exception: Expression field EXPR is required.\n");
+  }
+  else {
+    // Execute the expression to check if there are any mistakes in the expression
+    if (strlen(args) > 32 * 16) {
+      printf("Exception: Expression too long.\n");
+      return 0;
+    }
+    val = expr(args, &success, false);
+    
+    if (!success) {
+      printf("Exception: Watchpoint not set due to error(s) in your expression.\n");
+      return 0;
+    }
+    create_wp(args, val);
+  }
+  return 0;
+}
+
+static int cmd_d(char *args) {
+  char *arg = strtok(NULL, " ");
+  int i;
+
+  if (arg == NULL) {
+    printf("Exception: Field N is required.\n");
+  }
+  else {
+    i = atoi(args);
+    remove_wp(i);
+  }
+  return 0;
+}
+
+static int cmd_a(char *args) {
+  alwaysprintasm = !alwaysprintasm;
+  return 0;
+}
+
 static int cmd_help(char *args);
-static int cmd_si(char *args);
-static int cmd_info(char *args);
-static int cmd_x(char *args);
-static int cmd_p(char *args);
-static int cmd_w(char *args);
-static int cmd_d(char *args);
 
 static struct {
   char *name;
@@ -59,13 +294,16 @@ static struct {
   { "help", "Display informations about all supported commands", cmd_help },
   { "c", "Continue the execution of the program", cmd_c },
   { "q", "Exit NEMU", cmd_q },
-  { "si", "Let the program execute n steps", cmd_si },
-  { "info", "Display the register status and the watchpoint information", cmd_info},
-  { "x", "Caculate the value of expression and display the content of the address", cmd_x},
-  { "p","Calculate an expression", cmd_p},
-  { "w", "Create a watchpoint", cmd_w},
-  { "d", "Delete a watchpoint", cmd_d},
-  /* TODO: Add more commands */
+  { "si", "N - Step in for N steps", cmd_si },
+  { "info", "SUBCMD - Provide program status. SUBCMD = r or w", cmd_info },
+  { "p", "EXPR - Evaluate expression", cmd_p },
+  { "x", "N EXPR - Output 4N bytes from the address evaluated form EXPR", cmd_x },
+  { "pp", "EXPR - Evaluate expression with physical address", cmd_pp },
+  { "xp", "N EXPR - Output 4N bytes from the address evaluated form EXPR with physical address", cmd_xp },
+  { "pa", "EXPR - Print physical address of EXPR", cmd_pa },
+  { "w", "EXPR - Set a watchpoint at the address evaluated from EXPR", cmd_w },
+  { "d", "N - Delete the watchpoint numbered N", cmd_d },
+  { "a", "Trigger always print the assembly code", cmd_a }
 };
 
 #define NR_CMD (sizeof(cmd_table) / sizeof(cmd_table[0]))
@@ -73,7 +311,6 @@ static struct {
 static int cmd_help(char *args) {
   /* extract the first argument */
   char *arg = strtok(NULL, " ");
-  //printf("111%s\n%s\n", args, arg);
   int i;
 
   if (arg == NULL) {
@@ -94,108 +331,8 @@ static int cmd_help(char *args) {
   return 0;
 }
 
-static int cmd_si(char *args) {
-  /*get the steps number*/
-  int steps;
-  if (args == NULL){
-    steps = 1;
-  }
-  else{
-    steps = atoi(strtok(NULL, " "));
-  }
-
-  cpu_exec(steps);
-  return 0;
-}
-
-static int cmd_info(char *args) {
-  if (args == NULL) {
-    printf("Please input the info r or info w\n");
-  }
-  else {
-    if (strcmp(args, "r") == 0) {
-      printf("eax:  0x%-10x    %-10d\n", cpu.eax, cpu.eax);
-      printf("edx:  0x%-10x    %-10d\n", cpu.edx, cpu.edx);
-      printf("ecx:  0x%-10x    %-10d\n", cpu.ecx, cpu.ecx);
-      printf("ebx:  0x%-10x    %-10d\n", cpu.ebx, cpu.ebx);
-      printf("ebp:  0x%-10x    %-10d\n", cpu.ebp, cpu.ebp);
-      printf("esi:  0x%-10x    %-10d\n", cpu.esi, cpu.esi);
-      printf("esp:  0x%-10x    %-10d\n", cpu.esp, cpu.esp);
-      printf("eip:  0x%-10x    %-10d\n", cpu.eip, cpu.eip);
-    }
-    else if (strcmp(args, "w") == 0) {
-      display_wp();
-    }
-    else {
-      printf("The info command need a parameter 'r' or 'w'\n");
-    }
-  }
-  return 0;
-}
-
-static int cmd_x(char *args) {
-  if (args == NULL) {
-    printf("Input invalid command!\n");
-  }
-  else {
-    int num, addr, i;
-    char *exp;
-    num = atoi(strtok(NULL, " "));
-    exp = strtok(NULL, " ");
-    addr = trans(exp);
-
-    for (i = 0; i < num; i++) {
-      printf("0x%x\n", vaddr_read(addr, 4));
-      addr += 4;
-    }
-
-  }
-  return 0;
-}
-
-static int cmd_p(char *args) {
-  if (args == NULL) {
-    printf("Input invalid command! Please input the expression.\n");
-  }
-  else {
-    init_regex();
-
-    bool success = true;
-    //printf("args = %s\n", args);
-    int result = expr(args, &success);
-
-    if (success) {
-      printf("result = %d\n", result);
-    }
-    else {
-      printf("Invalid expression!\n");
-    }
-  }
-  return 0;
-}
-
-static int cmd_w(char *args) {
-  if (args == NULL) {
-    printf("Input invalid command! Please input the expression.\n");
-  }
-  else {
-    insert_wp(args);
-  }
-  return 0;
-}
-
-static int cmd_d(char *args) {
-  if (args == NULL) {
-    printf("Input invalid command! Please input the NO.\n");
-  }
-  else {
-    int no = atoi(args);
-    delete_wp(no);
-  }
-  return 0;
-}
-
 void ui_mainloop(int is_batch_mode) {
+  alwaysprintasm = false;
   if (is_batch_mode) {
     cmd_c(NULL);
     return;
@@ -232,19 +369,4 @@ void ui_mainloop(int is_batch_mode) {
 
     if (i == NR_CMD) { printf("Unknown command '%s'\n", cmd); }
   }
-}
-
-int trans(char *e) {
-  int len, num, i, j;
-  len = strlen(e);
-  num = 0;
-  j = 1;
-
-  for (i = len-1; i > 1; i--) {
-    num += (e[i]-'0')*j;
-    j *= 16;
-  }
-//  printf("num = %d\n", num);
-
-  return num;
 }

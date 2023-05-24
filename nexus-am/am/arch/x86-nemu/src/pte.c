@@ -66,11 +66,33 @@ void _switch(_Protect *p) {
 }
 
 void _map(_Protect *p, void *va, void *pa) {
+  int iterator;
+  uint32_t *PageDirectory = p->ptr;
+  uint32_t DIR = (uint32_t)va >> 22;
+  uint32_t PAGE = (uint32_t)va >> 12 & 0x000003FF;
+  
+  if ((PageDirectory[DIR] & 1) == 0) {
+    PageDirectory[DIR] = (uint32_t)(palloc_f()) | PTE_P;
+    for (iterator = 0; iterator < NR_PTE; iterator++)
+        ((uint32_t *)(PageDirectory[DIR]))[iterator] = 0;
+  }
+  uint32_t PageTable = PageDirectory[DIR];
+  ((uint32_t *)(PageTable & 0xFFFFF000))[PAGE] = (uint32_t)pa | PTE_P;
 }
 
 void _unmap(_Protect *p, void *va) {
 }
 
 _RegSet *_umake(_Protect *p, _Area ustack, _Area kstack, void *entry, char *const argv[], char *const envp[]) {
-  return NULL;
+  *(uint32_t*)(ustack.end - 4) = 0; // envp
+  *(uint32_t*)(ustack.end - 8) = 0; // argv
+  *(uint32_t*)(ustack.end - 12) = 0; // argc
+  *(uint32_t*)(ustack.end - 16) = 0; // retaddr
+  *(uint32_t*)(ustack.end - 20) = 0x00000202; // eflags
+  *(uint32_t*)(ustack.end - 24) = 8; // cs
+  *(uint32_t*)(ustack.end - 28) = (uint32_t)entry; // eip
+  *(uint32_t*)(ustack.end - 32) = 0; // error_code
+  *(uint32_t*)(ustack.end - 36) = 0x81; // irq
+  //// gpr don't care
+  return (_RegSet*)(ustack.end - 68);
 }

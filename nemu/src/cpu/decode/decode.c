@@ -29,24 +29,11 @@ static inline make_DopHelper(I) {
 /* sign immediate */
 static inline make_DopHelper(SI) {
   assert(op->width == 1 || op->width == 4);
-
   op->type = OP_TYPE_IMM;
-
-  /* TODO: Use instr_fetch() to read `op->width' bytes of memory
-   * pointed by `eip'. Interpret the result as a signed immediate,
-   * and assign it to op->simm.
-   *
-   op->simm = ???
-   */
-	if (op->width == 4) {
-		op->simm = instr_fetch(eip, op->width);
-	}
-	else if (op->width == 2) {
-		op->simm = (int16_t)((uint16_t)instr_fetch(eip, op->width));
-	}
-	else {
-		op->simm = (int16_t)(int8_t)((uint8_t)instr_fetch(eip, op->width));
-	}
+  
+  op->simm = instr_fetch(eip, op->width);
+  op->simm = ((op->simm << (8 * (4 - op->width))) >> (8 * (4 - op->width)));
+  
   rtl_li(&op->val, op->simm);
 
 #ifdef DEBUG
@@ -168,6 +155,7 @@ make_DHelper(mov_I2E) {
   decode_op_I(eip, id_src, true);
 }
 
+
 /* XX <- Ib
  * eXX <- Iv
  */
@@ -186,12 +174,28 @@ make_DHelper(I) {
   decode_op_I(eip, id_dest, true);
 }
 
+make_DHelper(SI) {
+  decode_op_SI(eip, id_dest, true);
+}
+
 make_DHelper(r) {
   decode_op_r(eip, id_dest, true);
 }
 
 make_DHelper(E) {
   decode_op_rm(eip, id_dest, true, NULL, false);
+}
+
+make_DHelper(int3) {
+  id_dest->type = OP_TYPE_IMM;
+  id_dest->imm = 3;
+  rtl_li(&id_dest->val, id_dest->imm);
+}
+
+make_DHelper(J_gp5) {
+  // for use with call r/m
+  // the target address can be computed in the decode stage
+  decoding.jmp_eip = id_dest->val;
 }
 
 make_DHelper(gp7_E) {
@@ -273,10 +277,6 @@ make_DHelper(J) {
   decoding.jmp_eip = id_dest->simm + *eip;
 }
 
-make_DHelper(push_SI) {
-  decode_op_SI(eip, id_dest, true);
-}
-
 make_DHelper(in_I2a) {
   id_src->width = 1;
   decode_op_I(eip, id_src, true);
@@ -312,7 +312,12 @@ make_DHelper(out_a2dx) {
 }
 
 void operand_write(Operand *op, rtlreg_t* src) {
-  if (op->type == OP_TYPE_REG) { rtl_sr(op->reg, op->width, src); }
-  else if (op->type == OP_TYPE_MEM) { rtl_sm(&op->addr, op->width, src); }
+  if (op->type == OP_TYPE_REG) { 
+    rtl_sr(op->reg, op->width, src); 
+  }
+  else if (op->type == OP_TYPE_MEM) { 
+    //Log("Writing to memory at Virtual address 0x%08X, physical address 0x%08X", op->addr, page_translate(op->addr, false));
+    rtl_sm(&op->addr, op->width, src); 
+  }
   else { assert(0); }
 }
