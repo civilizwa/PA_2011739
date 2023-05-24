@@ -57,7 +57,7 @@ static inline void load_img() {
     size = load_default_img();
   }
   else {
-    int ret;
+    //int ret;
 
     FILE *fp = fopen(img_file, "rb");
     Assert(fp, "Can not open '%s'", img_file);
@@ -69,7 +69,7 @@ static inline void load_img() {
 
     fseek(fp, 0, SEEK_SET);
     ret = fread(guest_to_host(ENTRY_START), size, 1, fp);
-    assert(ret == 1);
+    //assert(ret == 1);
 
     fclose(fp);
   }
