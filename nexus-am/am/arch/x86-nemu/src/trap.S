@@ -1,7 +1,5 @@
 #----|-------entry-------|-errorcode-|---irq id---|---handler---|
-.globl vectimer;vectimer:  pushl $0;  pushl $0x20; jmp asm_trap
 .globl vecsys;    vecsys:  pushl $0;  pushl $0x80; jmp asm_trap
-.globl veckern;  veckern:  pushl $0;  pushl $0x81; jmp asm_trap
 .globl vecnull;  vecnull:  pushl $0;  pushl   $-1; jmp asm_trap
 
 asm_trap:
@@ -11,7 +9,6 @@ asm_trap:
   call irq_handle
 
   addl $4, %esp
-  mov %eax, %esp
 
   popal
   addl $8, %esp

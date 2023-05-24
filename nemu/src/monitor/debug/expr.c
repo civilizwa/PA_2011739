@@ -52,7 +52,7 @@ static struct rule {
 
   {"0x[0-9a-fA-F]+", TK_HEXNUM},
   {"[0-9]+", TK_DECNUM}, 
-  {"\\$[a-z][a-z0-9]+", TK_REGNAME},
+  {"\\$[a-z]+", TK_REGNAME},
   {" +", TK_NOTYPE},    // spaces
   {"\\(", '('},         // left parenthese
   {"\\)", ')'},         // right parenthese
@@ -345,7 +345,7 @@ uint32_t hexstr2int(char* hexnum) {
 }
 
 
-uint32_t eval(int p, int q, bool *success, bool isphysicaladdr) {
+uint32_t eval(int p, int q, bool *success) {
   int domop;
   uint32_t val1;
   uint32_t val2;
@@ -362,10 +362,6 @@ uint32_t eval(int p, int q, bool *success, bool isphysicaladdr) {
     if (tokens[p].type == TK_HEXNUM)
       return hexstr2int(tokens[p].str);
     if (tokens[p].type == TK_REGNAME) {
-      if (!strcmp(tokens[p].str, "$cr0"))
-        return cpu.cr0;
-      if (!strcmp(tokens[p].str, "$cr3"))
-        return cpu.cr3;
       if (!strcmp(tokens[p].str, "$eip"))
         return cpu.eip;
       if (!strcmp(tokens[p].str, "$eflags"))
@@ -400,7 +396,7 @@ uint32_t eval(int p, int q, bool *success, bool isphysicaladdr) {
     return 0;
   }
   else if (check_parentheses(p, q, success) == true) {
-    return eval(p + 1, q - 1, success, isphysicaladdr);
+    return eval(p + 1, q - 1, success);
   }
   else if (*success) {
     domop = finddom(p, q);
@@ -417,16 +413,12 @@ uint32_t eval(int p, int q, bool *success, bool isphysicaladdr) {
          it is an operator, so as long as there are still tokens before deref/neg
          in the subexpr, deref/neg will not be the domop.
       */ 
-      val1 = eval(p + 1, q, success, isphysicaladdr);
+      val1 = eval(p + 1, q, success);
       if (*success == false)
         return 0;
       
-      if (tokens[domop].type == TK_DEREF) {
-        if (isphysicaladdr)
-          return paddr_read(val1, 4);
-        else
-          return vaddr_read(val1, 4);
-      }
+      if (tokens[domop].type == TK_DEREF)
+        return vaddr_read(val1, 4);
       if (tokens[domop].type == TK_NEG)  
         return -val1;
       if (tokens[domop].type == TK_LGCNOT)  
@@ -435,8 +427,8 @@ uint32_t eval(int p, int q, bool *success, bool isphysicaladdr) {
         return ~val1;
     }
     
-    val1 = eval(p, domop - 1, success, isphysicaladdr);
-    val2 = eval(domop + 1, q, success, isphysicaladdr);
+    val1 = eval(p, domop - 1, success);
+    val2 = eval(domop + 1, q, success);
     if (*success == false)
       return 0;
     
@@ -483,7 +475,7 @@ uint32_t eval(int p, int q, bool *success, bool isphysicaladdr) {
   return 0;
 }
 
-uint32_t expr(char *e, bool *success, bool isphysicaladdr) {
+uint32_t expr(char *e, bool *success) {
   *success = true;
   int i;
   
@@ -500,5 +492,5 @@ uint32_t expr(char *e, bool *success, bool isphysicaladdr) {
       tokens[i].type = TK_NEG;
   }
   
-  return eval(0, nr_token - 1, success, isphysicaladdr);
+  return eval(0, nr_token - 1, success);
 }

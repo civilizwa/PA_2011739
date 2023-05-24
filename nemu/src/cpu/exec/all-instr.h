@@ -1,8 +1,6 @@
 #include "cpu/exec.h"
 
 make_EHelper(mov);
-make_EHelper(movfromc);
-make_EHelper(movtoc);
 make_EHelper(lea);
 make_EHelper(movsx);
 make_EHelper(movzx);

@@ -6,7 +6,7 @@
 static WP wp_pool[NR_WP];
 static WP *head, *free_, *tail, *free_tail;
 
-extern uint32_t expr(char *e, bool *success, bool isphysicaladdr);
+extern uint32_t expr(char *e, bool *success);
 
 void init_wp_pool() {
   int i;
@@ -140,7 +140,7 @@ bool eval_wp() {
   int val;
   
   while (inum != NULL) {
-    val = expr(inum->expr, &success, false);
+    val = expr(inum->expr, &success);
     if (inum->val != val) {
       printf("Hit watchpoint number %d, value changed from %d to %d.\n", inum->NO, inum->val, val);
       inum->val = val;
