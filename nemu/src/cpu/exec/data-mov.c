@@ -115,7 +115,18 @@ make_EHelper(lea) {
   print_asm_template2(lea);
 }
 
-make_EHelper(mov_store_cr) {
-  rtl_store_cr(id_dest -> reg, &id_src -> val);
+make_EHelper(movfromc) {
+  sprintf(id_dest->str, "%s", id_src->str);
+  if(id_dest->reg == 0) {
+    rtl_sr(id_src->reg, id_src->width, &cpu.cr0);
+    sprintf(id_src->str, "cr0");
+  }
+  else if(id_dest->reg == 3) {
+    rtl_sr(id_src->reg, id_src->width, &cpu.cr3);
+    sprintf(id_src->str, "cr3");
+  }
+  else
+    panic("Unexpected control register at 0x%08X\n", cpu.eip);
   print_asm_template2(mov);
 }
+
