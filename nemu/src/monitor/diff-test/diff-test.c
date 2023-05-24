@@ -127,15 +127,15 @@ void init_qemu_reg() {
 }
 
 void difftest_step(uint32_t eip) {
-  union gdb_regs r;
+  union gdb_regs r, mine;
   bool diff = false;
 
   if (is_skip_nemu) {
     is_skip_nemu = false;
     return;
   }
-
-  if (is_skip_qemu) {
+  
+	if (is_skip_qemu) {
     // to skip the checking of an instruction, just copy the reg state to qemu
     gdb_getregs(&r);
     regcpy_from_nemu(r);
@@ -146,45 +146,25 @@ void difftest_step(uint32_t eip) {
 
   gdb_si();
   gdb_getregs(&r);
-  // TODO: Check the registers state with QEMU.
+  regcpy_from_nemu(mine);
+  
+	// TODO: Check the registers state with QEMU.
   // Set `diff` as `true` if they are not the same.
-  // TODO();
-  if(r.eax!=cpu.eax) {
-    printf("expect: %d true: %d at: %x\n", r.eax, cpu.eax, cpu.eip);
-    diff=true;
-  }
-  if(r.ecx!=cpu.ecx) {
-    printf("expect: %d true: %d at: %x \n", r.ecx, cpu.ecx, cpu.eip);
-    diff=true;
-  }
-  if(r.edx!=cpu.edx) {
-    printf("expect: %d true: %d at: %x\n", r.edx, cpu.edx, cpu.eip);
-    diff=true;
-  }
-  if(r.ebx!=cpu.ebx) {
-    printf("expect: %d true: %d at: %x\n", r.ebx, cpu.ebx, cpu.eip);
-    diff=true;
-  }
-  if(r.esp!=cpu.esp) {
-    printf("expect: %d true: %d at: %x\n", r.esp, cpu.esp, cpu.eip);
-	  diff=true;
-  }
-  if(r.ebp!=cpu.ebp) {
-    printf("expect: %d true: %d at: %x\n", r.ebp, cpu.ebp, cpu.eip);
-	  diff=true;
-  }
-  if(r.esi!=cpu.esi) {
-    printf("expect: %d true: %d at: %x\n", r.esi, cpu.esi, cpu.eip);
-	  diff=true;
-  }
-  if(r.edi!=cpu.edi) {
-    printf("expect: %d true: %d at: %x\n", r.edi, cpu.edi, cpu.eip);
-	  diff=true;
-  }
-  if(r.eip!=cpu.eip) {
-	  diff=true;
-	  Log("different:qemu.eip=0x%x,nemu.eip=0x%x",r.eip,cpu.eip);
-  }
+  if(r.eax != mine.eax || r.ecx != mine.ecx || r.edx != mine.edx ||
+		 r.ebx != mine.ebx || r.esp != mine.esp || r.ebp != mine.ebp ||
+		 r.esi != mine.esi || r.edi != mine.edi || r.eip != mine.eip) {
+    diff = true;
+    printf("qemus eax:0x%08x, mine eax:0x%08x @eip:0x%08x\n", r.eax, mine.eax, mine.eip);
+    printf("qemus ecx:0x%08x, mine ecx:0x%08x @eip:0x%08x\n", r.ecx, mine.ecx, mine.eip);
+    printf("qemus edx:0x%08x, mine edx:0x%08x @eip:0x%08x\n", r.edx, mine.edx, mine.eip);
+    printf("qemus ebx:0x%08x, mine ebx:0x%08x @eip:0x%08x\n", r.ebx, mine.ebx, mine.eip);
+    printf("qemus esp:0x%08x, mine esp:0x%08x @eip:0x%08x\n", r.esp, mine.esp, mine.eip);
+    printf("qemus ebp:0x%08x, mine ebp:0x%08x @eip:0x%08x\n", r.ebp, mine.ebp, mine.eip);
+    printf("qemus esi:0x%08x, mine esi:0x%08x @eip:0x%08x\n", r.esi, mine.esi, mine.eip);
+    printf("qemus edi:0x%08x, mine edi:0x%08x @eip:0x%08x\n", r.edi, mine.edi, mine.eip);
+    printf("qemus eip:0x%08x, mine eip:0x%08x @eip:0x%08x\n", r.eip, mine.eip, mine.eip);
+  } 
+
   if (diff) {
     nemu_state = NEMU_END;
   }
