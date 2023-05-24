@@ -130,3 +130,15 @@ make_EHelper(movfromc) {
   print_asm_template2(mov);
 }
 
+make_EHelper(movtoc) {
+  sprintf(id_dest->str, "cr%d", id_dest->reg);
+  if(id_dest->reg == 0) {
+    cpu.cr0 = id_src->val;
+  }
+  else if(id_dest->reg == 3) {
+    cpu.cr3 = id_src->val;
+  }
+  else
+    panic("Unexpected control register at 0x%08X\n", cpu.eip);
+  print_asm_template2(mov);
+}
