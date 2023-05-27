@@ -4,6 +4,7 @@
 #define PTXSHFT 12
 #define PDXSHFT 22
 #define PTE_ADDR(pte) ((uint32_t)(pte)& ~0xfff)
+#define PDX(va) (((uint32_t)(va)>>PDXSHFT)&0x3ff)
 
 #define pmem_rw(addr, type) *(type *)({\
     Assert(addr < PMEM_SIZE, "physical address(0x%08x) is out of bound at 0x%08X", addr, cpu.eip); \
