@@ -8,14 +8,14 @@
  */
 #define MAX_INSTR_TO_PRINT 10
 
-extern bool eval_wp();
-
 int nemu_state = NEMU_STOP;
 
 void exec_wrapper(bool);
+int * haschanged();
 
 /* Simulate how the CPU works. */
 void cpu_exec(uint64_t n) {
+  //printf("n = %lu\n", n);
   if (nemu_state == NEMU_END) {
     printf("Program execution has ended. To restart the program, exit NEMU and run again.\n");
     return;
@@ -23,18 +23,25 @@ void cpu_exec(uint64_t n) {
   nemu_state = NEMU_RUNNING;
 
   bool print_flag = n < MAX_INSTR_TO_PRINT;
-
+  //printf("i am out the for\n");
   for (; n > 0; n --) {
     /* Execute one instruction, including instruction fetch,
      * instruction decode, and the actual execution. */
-    exec_wrapper(print_flag || alwaysprintasm);
+    //printf("%lu\ni am in the cpu exec\n", n);
+    exec_wrapper(print_flag);
 
 #ifdef DEBUG
     /* TODO: check watchpoints here. */
-
+  int *no = haschanged();
+  if (*no != -1) {
+    int i;
+    for (i = 0; *(no + i) != -1; i++) {
+      printf("NO.%d ", *(no + i));
+    }
+    printf("watchpoint has been changed\n");
+    nemu_state = NEMU_STOP;
+  }
 #endif
-    if (nemu_state == NEMU_RUNNING && eval_wp())
-      break;
 
 #ifdef HAS_IOE
     extern void device_update();

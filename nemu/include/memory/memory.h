@@ -2,7 +2,6 @@
 #define __MEMORY_H__
 
 #include "common.h"
-#include "device/mmio.h"
 
 extern uint8_t pmem[];
 

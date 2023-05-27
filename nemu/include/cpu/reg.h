@@ -16,57 +16,64 @@ enum { R_AL, R_CL, R_DL, R_BL, R_AH, R_CH, R_DH, R_BH };
 
 typedef struct {
   union {
-    struct {
-      union {
-        uint32_t _32;
-        uint16_t _16;
-        uint8_t _8[2];
-      };
+    union {
+      uint32_t _32;
+      uint16_t _16;
+      uint8_t _8[2];
     } gpr[8];
 
-    /* Do NOT change the order of the GPRs' definitions. */
+  /* Do NOT change the order of the GPRs' definitions. */
 
-    /* In NEMU, rtlreg_t is exactly uint32_t. This makes RTL instructions
-     * in PA2 able to directly access these registers.
-     */
+  /* In NEMU, rtlreg_t is exactly uint32_t. This makes RTL instructions
+   * in PA2 able to directly access these registers.
+   */
     struct {
       rtlreg_t eax, ecx, edx, ebx, esp, ebp, esi, edi;
     };
   };
 
   vaddr_t eip;
-  
-  union {
-    struct {
-      uint8_t CF     :1;
-      uint8_t dummy1 :5;
-      uint8_t ZF     :1;
-      uint8_t SF     :1;
-      uint8_t dummy2 :1;
-      uint8_t IF     :1;
-      uint8_t dummy3 :1;
-      uint8_t OF     :1;
-      uint32_t dummy4 :20;
-    } flags;
-    uint32_t eflags;
-  };
-  
-  struct {
-    uint16_t limit;
-    uint32_t base;
-  } idtr;
-  uint32_t cr0;
-  uint32_t cr3;
-  bool INTR;
-  uint16_t cs;
+	unsigned int cs;
+
+	union {
+		rtlreg_t eflags_init;
+		struct {
+			unsigned int CF:1;
+			unsigned int   :5;
+			unsigned int ZF:1;
+			unsigned int SF:1;
+			unsigned int TF:1;
+			unsigned int IF:1;
+			unsigned int DF:1;
+			unsigned int OF:1;
+		};
+	} eflags;
+
+	struct {
+		uint16_t limit;
+		uint32_t base;
+	} idtr;
+
+	union {
+		rtlreg_t cr0;
+		struct {
+			unsigned int PE:1;
+			unsigned int MP:1;
+			unsigned int EM:1;
+			unsigned int TS:1;
+			unsigned int ET:1;
+			unsigned int RESERVED:26;
+			unsigned int PG:1;
+		};
+	};
+
+	rtlreg_t cr3;
+
 } CPU_state;
 
 extern CPU_state cpu;
 
 static inline int check_reg_index(int index) {
-  // printf("eip = 0x%08X", cpu.eip);
-  if(!(index >= 0 && index < 8))
-    printf("eip = 0x%08X", cpu.eip);
   assert(index >= 0 && index < 8);
   return index;
 }
