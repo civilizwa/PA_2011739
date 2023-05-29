@@ -32,15 +32,11 @@ void switch_game() {
 }
 
 _RegSet* schedule(_RegSet *prev) {
-
-	// save the context pointer
-	current->tf = prev;
-
-	// always select pcb[0] as the new process
-  current = (current == current_game ? &pcb[1] : current_game);
-
-	// TODO: switch to the new address space,
-	// then return the new context
-  _switch(&current->as);
-  return current->tf;
+    if(current != NULL) {
+current -> tf = prev;
+}
+current = pcb[0];
+Log("ptr = 0x%x\n", (uint32_t)current -> as.ptr);
+_switch(&current -> as);
+return current -> tf;
 }
