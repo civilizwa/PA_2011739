@@ -22,11 +22,21 @@ int mm_brk(uint32_t new_brk) {
     if (new_brk > current->max_brk) {
       // TODO: map memory region [current->max_brk, new_brk)
       // into address space current->as
-      uintptr_t pa, va;
-      for (va = (current->max_brk+0xfff) & ~0xfff; va < new_brk; va += PGSIZE) {
-        pa = (uintptr_t)new_page();
-        _map(&current->as, (void *)va, (void *)pa);
+      uint32_t begin=PGROUNDDOWN(current->max_brk);
+      uint32_t end=PGROUNDDOWN(new_brk);
+      if((new_brk&0xfff)==0){
+        end-=PGSIZE;
       }
+      for(uint32_t va=begin;va<=end;va+=PGSIZE){
+        void *pa=new_page();
+        _map(&(current->as),(void*)va,pa);
+      }
+      current->max_brk=new_brk;
+      // uintptr_t pa, va;
+      // for (va = (current->max_brk+0xfff) & ~0xfff; va < new_brk; va += PGSIZE) {
+      //   pa = (uintptr_t)new_page();
+      //   _map(&current->as, (void *)va, (void *)pa);
+      // }
 
       current->max_brk = va;
     }
