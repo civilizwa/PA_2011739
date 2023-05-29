@@ -151,7 +151,7 @@ PAL_FadeOut(
    {
       palette[i] = VIDEO_GetPalette()[i];
    }
-   
+
    //
    // Start fading out...
    //
@@ -167,16 +167,19 @@ PAL_FadeOut(
       {
          break;
       }
+
       for (i = 0; i < 256; i++)
       {
          newpalette[i].r = (palette[i].r * j) >> 6;
          newpalette[i].g = (palette[i].g * j) >> 6;
          newpalette[i].b = (palette[i].b * j) >> 6;
       }
+
       VIDEO_SetPalette(newpalette);
+
       UTIL_Delay(10);
    }
-   
+
    memset(newpalette, 0, sizeof(newpalette));
    VIDEO_SetPalette(newpalette);
 }

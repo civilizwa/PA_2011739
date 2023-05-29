@@ -4,6 +4,10 @@
 
 #define PMEM_SIZE (128 * 1024 * 1024)
 
+#define PTXSHIFT 12
+#define PDXSHIFT 22
+
+#define PTE_ADDR(pte) ((uint32_t)(pte) & ~0xfff)
 #define pmem_rw(addr, type) *(type *)({\
     Assert(addr < PMEM_SIZE, "physical address(0x%08x) is out of bound", addr); \
     guest_to_host(addr); \

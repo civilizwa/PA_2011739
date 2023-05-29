@@ -4,16 +4,10 @@
 #include <sys/time.h>
 #include <assert.h>
 #include <time.h>
-#include <stdio.h>
 #include "syscall.h"
 
 // TODO: discuss with syscall interface
 #ifndef __ISA_NATIVE__
-
-extern uint32_t end;
-extern uint32_t _end;
-
-uint32_t lastpb = (uint32_t)&end;
 
 // FIXME: this is temporary
 
@@ -28,7 +22,7 @@ void _exit(int status) {
 }
 
 int _open(const char *path, int flags, mode_t mode) {
-  return _syscall_(SYS_open, (uint32_t)path, flags, mode);
+  return _syscall_(SYS_open, (intptr_t)path, flags, mode);
 }
 
 int _write(int fd, void *buf, size_t count){
@@ -36,17 +30,21 @@ int _write(int fd, void *buf, size_t count){
 }
 
 void *_sbrk(intptr_t increment){
-  uint32_t lasttimepb = lastpb;
-  if (_syscall_(SYS_brk, (uint32_t)&lastpb + increment, 0, 0) == 0) {
-    lastpb += increment;
-    return (void*)lasttimepb;
+  extern char _end;
+  static void *prog_brk = (void *)&_end;
+  void *old;
+
+
+  old = prog_brk;
+  prog_brk += increment;
+  if (_syscall_(SYS_brk, (intptr_t)prog_brk, 0, 0) == 0) {
+    return (void *)old;
   }
-  else
-    return (void*)-1;
+  assert(0);
 }
 
 int _read(int fd, void *buf, size_t count) {
-  return _syscall_(SYS_read, fd, (uint32_t)buf, count);
+  return _syscall_(SYS_read, fd, (uintptr_t)buf, count);
 }
 
 int _close(int fd) {

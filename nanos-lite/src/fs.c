@@ -1,10 +1,10 @@
 #include "fs.h"
 
-extern void ramdisk_write(const void *buf, off_t offset, size_t len);
-extern void ramdisk_read(void *buf, off_t offset, size_t len);
-extern ssize_t dispinfo_read(void *buf, off_t offset, size_t len);
-extern ssize_t fb_write(const void *buf, off_t offset, size_t len);
-extern size_t events_read(void *buf, size_t len);
+void ramdisk_read(void *buf, off_t offset, size_t len);
+void ramdisk_write(const void *buf, off_t offset, size_t len);
+void fb_write(const void *buf, off_t offset, size_t len);
+void dispinfo_read(void *buf, off_t offset, size_t len);
+size_t events_read(void *buf, size_t len);
 
 typedef struct {
   char *name;
@@ -14,8 +14,6 @@ typedef struct {
 } Finfo;
 
 enum {FD_STDIN, FD_STDOUT, FD_STDERR, FD_FB, FD_EVENTS, FD_DISPINFO, FD_NORMAL};
-
-static const char filedispinfo[] = "WIDTH:400\nHEIGHT:300";
 
 /* This is the information about all files in disk. */
 static Finfo file_table[] __attribute__((used)) = {
@@ -31,105 +29,105 @@ static Finfo file_table[] __attribute__((used)) = {
 #define NR_FILES (sizeof(file_table) / sizeof(file_table[0]))
 
 void init_fs() {
-  file_table[FD_FB].size = 400 * 320 * 4;
+  // TODO: initialize the size of /dev/fb
+  file_table[FD_FB].size = _screen.width * _screen.height * sizeof(uint32_t);
+  file_table[FD_FB].open_offset = 0;
+}
+
+ssize_t fs_write(int fd, uint8_t *buf, size_t len) {
+  size_t i = 0;
+  size_t size, nwrite;
+  Finfo *fp = &file_table[fd];
+
+  size = fp->size - fp->open_offset;
+  nwrite = len > size ? size : len;
+
+  switch (fd) {
+  case FD_STDOUT:
+  case FD_STDERR:
+    while (i++ < len)
+      _putc(*buf++);
+    return len;
+
+  case FD_FB:
+    fb_write(buf, fp->open_offset, nwrite);
+    break;
+
+  default:
+    if (fd < 6 || fd >= NR_FILES)
+      return -1;
+    ramdisk_write(buf, fp->disk_offset + fp->open_offset, nwrite);
+    break;
+  }
+  fp->open_offset += nwrite;
+  return nwrite;
 }
 
 int fs_open(const char *pathname, int flags, int mode) {
-  int i;
-  for (i = 0; i < NR_FILES; i++) {
-    if (!strcmp(pathname, file_table[i].name)) {
-      file_table[i].open_offset = 0;
-      return i;
-    }
-  }
-  Log("File %s not found", pathname);
-  panic("PANIC: File not found in fs_open.");
-  return -1;
+  (void)flags; (void)mode; /* UNUSED */
+  int fd;
+  for (fd = 0; fd < NR_FILES; fd++)
+    if (strcmp(pathname, file_table[fd].name) == 0)
+      break;
+  assert(fd != NR_FILES);
+  file_table[fd].open_offset = 0;
+
+  return fd;
 }
 
-uintptr_t fs_getdiskoffset(int fd) {
-  return file_table[fd].disk_offset;
+ssize_t fs_read(int fd, void *buf, size_t len) {
+  ssize_t size, nread;
+  Finfo *fp = &file_table[fd];
+
+  size = fp->size - fp->open_offset;
+  nread = len > size ? size : len;
+
+
+  switch (fd) {
+  case FD_STDOUT:
+  case FD_STDERR:
+    return -1;
+
+  case FD_DISPINFO:
+    dispinfo_read(buf, fp->open_offset, nread);
+    break;
+
+  case FD_EVENTS:
+    return events_read(buf, len);
+
+  default:
+    if (fd < 6 || fd >= NR_FILES)
+      return -1;
+    ramdisk_read(buf, fp->disk_offset + fp->open_offset, nread);
+    break;
+  }
+  fp->open_offset += nread;
+  return nread;
+}
+
+off_t fs_lseek(int fd, off_t offset,int whence) {
+  Finfo *fp = &file_table[fd];
+
+  assert(fd < NR_FILES);
+
+  switch (whence) {
+  case SEEK_END: offset = fp->size + offset; break;
+  case SEEK_CUR: offset = fp->open_offset + offset; break;
+  case SEEK_SET: break;
+  default: return -1;
+  }
+
+  if (offset > fp->size || offset < 0)
+    return -1;
+
+  return fp->open_offset = offset;
 }
 
 int fs_close(int fd) {
+  (void)fd;
   return 0;
 }
 
 size_t fs_filesz(int fd) {
   return file_table[fd].size;
-}
-
-off_t fs_lseek(int fd, off_t offset, int whence) {
-  if (fd < 3)
-    return 0;
-  
-  switch (whence) {
-    case SEEK_SET:
-      file_table[fd].open_offset = offset;
-      break;
-    case SEEK_CUR:
-      file_table[fd].open_offset += offset;
-      break;
-    case SEEK_END:
-      file_table[fd].open_offset = fs_filesz(fd) + offset;
-      break;
-    default:
-      assert("ASSERT: Unexpected whence in fs_lseek");
-  }
-  return file_table[fd].open_offset;
-}
-
-ssize_t fs_read(int fd, void *buf, size_t len) {
-  ssize_t bytesread;
-  switch (fd) {
-    case 0:
-    case 1:
-    case 2:
-      break;
-    case FD_DISPINFO:
-      bytesread = dispinfo_read(buf, file_table[fd].open_offset, len);
-      file_table[fd].open_offset += bytesread;
-      return bytesread;
-    case FD_EVENTS:
-      return events_read(buf, len);
-    default:
-      bytesread = ((file_table[fd].open_offset + len <= fs_filesz(fd)) ? len : fs_filesz(fd) - file_table[fd].open_offset);
-      if (bytesread >= 0) {
-        ramdisk_read(buf, file_table[fd].open_offset + file_table[fd].disk_offset, bytesread);
-        file_table[fd].open_offset += bytesread;
-        return bytesread;
-      }
-      return 0;
-  }
-  return 0;
-}
-
-ssize_t fs_write(int fd, const void *buf, size_t len) {
-  ssize_t byteswritten;
-  switch (fd) {
-    case FD_STDOUT:
-    case FD_STDERR:
-      byteswritten = 0;
-      while(len--) {
-        _putc(((char*)buf)[byteswritten]);
-        byteswritten++;
-      }
-      return byteswritten;
-    case FD_FB:
-      byteswritten = fb_write(buf, file_table[fd].open_offset, len);
-      file_table[fd].open_offset += byteswritten;
-      return byteswritten;
-    case FD_DISPINFO:
-      // read only
-      return 0;
-    default:
-      byteswritten = ((file_table[fd].open_offset + len <= fs_filesz(fd)) ? len : fs_filesz(fd) - file_table[fd].open_offset);
-      if (byteswritten >= 0) {
-        ramdisk_write(buf, file_table[fd].open_offset + file_table[fd].disk_offset, byteswritten);
-        file_table[fd].open_offset += byteswritten;
-        return byteswritten;
-      }
-      return 0;
-  }
-  return 0;
 }
