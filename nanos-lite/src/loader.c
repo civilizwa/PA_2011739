@@ -10,18 +10,22 @@ extern size_t get_ramdisk_size();
 
 uintptr_t loader(_Protect *as, const char *filename) {
   int fd = fs_open(filename, 0, 0);
-  size_t nbyte = fs_filesz(fd);
+  int size = fs_filesz(fd);
+  int ppnum=size/PGSIZE;
+  if(size%PGSIZE!=0){
+    ppnum++;
+  }
   void *pa;
   void *va;
 
   Log("loaded: [%d]%s size:%d", fd, filename, nbyte);
 
-  void *end = DEFAULT_ENTRY + nbyte;
-  for (va = DEFAULT_ENTRY; va < end; va += PGSIZE) {
-    pa = new_page();
-    _map(as, va, pa);
-    fs_read(fd, pa, (end - va) < PGSIZE ? (end - va) : PGSIZE);
-  }
+ for(int i=0;i<ppnum;i++){
+  pa=new_page();
+  _map(as,va,pa);
+  fs_read(fd,pa,PGSIZE);
+  va++PGSIZE;
+ }
 
   return (uintptr_t)DEFAULT_ENTRY;
 }
