@@ -6,10 +6,33 @@ FLOAT F_mul_F(FLOAT a, FLOAT b) {
   return ((uint64_t)a * b) >> 16;
 }
 
-FLOAT F_div_F(FLOAT a, FLOAT b) {
-  assert(0);
-  return 0;
+FLOAT F_div_F(FLOAT a, FLOAT b)
+{
+  // assert(0);
+  // return 0;
+  assert(b != 0);
+  FLOAT x = Fabs(a);
+  FLOAT y = Fabs(b);
+  FLOAT z = x / y;
+  x = x % y;
+
+  for (int i = 0; i < 16; i++)
+  {
+    x <<= 1;
+    z <<= 1;
+    if (x >= y)
+    {
+      x -= y;
+      z++;
+    }
+  }
+  if (((a ^ b) & 0x80000000) == 0x80000000)
+  {
+    z = -z;
+  }
+  return z;
 }
+
 struct ieee754 {
   uint32_t frac :23;
   uint32_t exp  :8;
@@ -53,8 +76,9 @@ FLOAT f2F(float a) {
 }
 
 FLOAT Fabs(FLOAT a) {
-  assert(0);
-  return 0;
+  FLOAT Fabs(FLOAT a) {
+  return (a > 0) ? a : -a;
+}
 }
 
 /* Functions below are already implemented */
