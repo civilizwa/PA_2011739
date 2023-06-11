@@ -11,7 +11,11 @@ FLOAT F_div_F(FLOAT a, FLOAT b) {
   assert(0);
   return 0;
 }
-
+struct ieee754 {
+  uint32_t frac :23;
+  uint32_t exp  :8;
+  uint32_t sign :1;
+};
 FLOAT f2F(float a) {
   /* You should figure out how to convert `a' into FLOAT without
    * introducing x87 floating point instructions. Else you can
