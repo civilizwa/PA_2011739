@@ -27,8 +27,30 @@ FLOAT f2F(float a) {
    * performing arithmetic operations on it directly?
    */
 
-  assert(0);
-  return 0;
+  struct ieee754 *f = (struct ieee754 *)&a;
+  uint32_t res;
+  uint32_t frac;
+  int exp;
+
+  if ((f->exp & 0xff) == 0xff) {
+    // NaN or Inf
+    assert(0);
+  } else if (f->exp == 0) {
+    exp = 1 - 127;
+    frac = (f->frac & 0x7fffff);
+  } else {
+    exp = f->exp - 127;
+    frac = (f->frac & 0x7fffff) | (1 << 23);
+  }
+
+  if (exp >= 7 && exp < 22)
+    res = frac << (exp - 7);
+  else if (exp < 7 && exp > -32)
+    res = frac >> 7 >> -exp;
+  else
+    assert(0);
+
+  return (f->sign) ? -res : res;
 }
 
 FLOAT Fabs(FLOAT a) {
